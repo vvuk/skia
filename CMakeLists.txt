@@ -82,27 +82,27 @@ if(NOT "$ENV{DEP_EXPAT_OUTDIR}" STREQUAL "")
 endif()
 
 include_directories(
-  include/config
-  include/core
-  include/effects
-  include/gpu
-  include/images
-  include/pathops
-  include/pipe
-  include/ports
-  include/utils
-  src/core
-  src/image
-  src/opts
-  src/ports
-  src/sfnt
-  src/utils
-  third_party/etc1
-  third_party/ktx
-  src/gpu
+  skia/include/config
+  skia/include/core
+  skia/include/effects
+  skia/include/gpu
+  skia/include/images
+  skia/include/pathops
+  skia/include/pipe
+  skia/include/ports
+  skia/include/utils
+  skia/src/core
+  skia/src/gpu
+  skia/src/image
+  skia/src/opts
+  skia/src/ports
+  skia/src/sfnt
+  skia/src/utils
+  skia/third_party/etc1
+  skia/third_party/ktx
   )
 
-set_prefix(SKIA_CORE_SRC src/core/
+set_prefix(SKIA_CORE_SRC skia/src/core/
   SkAAClip.cpp
   SkAdvancedTypefaceMetrics.cpp
   SkAlphaRuns.cpp
@@ -244,7 +244,7 @@ set_prefix(SKIA_CORE_SRC src/core/
   SkWriter32.cpp
   SkXfermode.cpp
   )
-set_prefix(SKIA_EFFECTS_SRC src/effects/
+set_prefix(SKIA_EFFECTS_SRC skia/src/effects/
   gradients/SkBitmapCache.cpp
   gradients/SkClampRange.cpp
   gradients/SkGradientShader.cpp
@@ -303,7 +303,7 @@ set_prefix(SKIA_EFFECTS_SRC src/effects/
   SkTransparentShader.cpp
   SkXfermodeImageFilter.cpp
   )
-set_prefix(SKIA_GL_SRC src/gpu/
+set_prefix(SKIA_GL_SRC skia/src/gpu/
   effects/GrBezierEffect.cpp
   effects/GrBicubicEffect.cpp
   effects/GrConfigConversionEffect.cpp
@@ -410,7 +410,7 @@ set_prefix(SKIA_GL_SRC src/gpu/
   SkGrPixelRef.cpp
   SkGrTexturePixelRef.cpp
   )
-set_prefix(SKIA_IMAGE_SRC src/image/
+set_prefix(SKIA_IMAGE_SRC skia/src/image/
   SkImage_Codec.cpp
   SkImage.cpp
   SkImage_Gpu.cpp
@@ -420,7 +420,7 @@ set_prefix(SKIA_IMAGE_SRC src/image/
   SkSurface_Gpu.cpp
   SkSurface_Raster.cpp
   )
-set_prefix(SKIA_OPTS_SSE2_SRC src/opts/
+set_prefix(SKIA_OPTS_SSE2_SRC skia/src/opts/
   SkBitmapFilter_opts_SSE2.cpp
   SkBitmapProcState_opts_SSE2.cpp
   SkBlitRect_opts_SSE2.cpp
@@ -431,10 +431,10 @@ set_prefix(SKIA_OPTS_SSE2_SRC src/opts/
   SkXfermode_opts_SSE2.cpp
   opts_check_x86.cpp
   )
-set_prefix(SKIA_OPTS_SSSE3_SRC src/opts/
+set_prefix(SKIA_OPTS_SSSE3_SRC skia/src/opts/
   SkBitmapProcState_opts_SSSE3.cpp
   )
-set_prefix(SKIA_OPTS_ARM_NEON_SRC src/opts/
+set_prefix(SKIA_OPTS_ARM_NEON_SRC skia/src/opts/
   memset.arm.S
   SkBitmapProcState_opts_arm.cpp
   SkBlitMask_opts_arm.cpp
@@ -453,7 +453,7 @@ set_prefix(SKIA_OPTS_ARM_NEON_SRC src/opts/
   SkMorphology_opts_neon.cpp
   SkXfermode_opts_arm_neon.cpp
   )
-set_prefix(SKIA_OPTS_AARCH64_SRC src/opts/
+set_prefix(SKIA_OPTS_AARCH64_SRC skia/src/opts/
   SkBitmapProcState_opts_arm.cpp
   SkBlitMask_opts_arm.cpp
   SkBlitRow_opts_arm.cpp
@@ -469,7 +469,7 @@ set_prefix(SKIA_OPTS_AARCH64_SRC src/opts/
   SkMorphology_opts_neon.cpp
   SkXfermode_opts_arm_neon.cpp
   )
-set_prefix(SKIA_PATHOPS_SRC src/pathops/
+set_prefix(SKIA_PATHOPS_SRC skia/src/pathops/
   SkAddIntersections.cpp
   SkDCubicIntersection.cpp
   SkDCubicLineIntersection.cpp
@@ -499,11 +499,11 @@ set_prefix(SKIA_PATHOPS_SRC src/pathops/
   SkQuarticRoot.cpp
   SkReduceOrder.cpp
   )
-set_prefix(SKIA_SFNT_SRC src/sfnt/
+set_prefix(SKIA_SFNT_SRC skia/src/sfnt/
   SkOTTable_name.cpp
   SkOTUtils.cpp
   )
-set_prefix(SKIA_UTILS_SRC src/utils/
+set_prefix(SKIA_UTILS_SRC skia/src/utils/
   SkBase64.cpp
   SkBitSet.cpp
   SkBoundaryPatch.cpp
@@ -540,22 +540,22 @@ set_prefix(SKIA_UTILS_SRC src/utils/
   SkTextureCompressor.cpp
   SkSHA1.cpp
   )
-set_prefix(SKIA_THIRDPARTY_SRC third_party/
+set_prefix(SKIA_THIRDPARTY_SRC skia/third_party/
   etc1/etc1.cpp
   ktx/ktx.cpp
   )
 
 if(APPLE)
   add_definitions(-DSK_USE_POSIX_THREADS)
-  include_directories(include/utils/mac)
-  include_directories(src/utils/mac)
+  include_directories(skia/include/utils/mac)
+  include_directories(skia/src/utils/mac)
 
-  set_prefix(SKIA_GL_PLATFORM_SRC src/gpu/gl/mac/
+  set_prefix(SKIA_GL_PLATFORM_SRC skia/src/gpu/gl/mac/
     GrGLCreateNativeInterface_mac.cpp
     SkNativeGLContext_mac.cpp
     )
 
-  set_prefix(SKIA_PORTS_SRC src/ports/
+  set_prefix(SKIA_PORTS_SRC skia/src/ports/
     SkDebug_stdio.cpp
     SkFontHost_mac.cpp
     SkGlobalInitialization_default.cpp
@@ -568,7 +568,7 @@ if(APPLE)
 
   set(SKIA_FONTS_SRC "")
 
-  set_prefix(SKIA_UTILS_PLATFORM_SRC src/utils/mac/
+  set_prefix(SKIA_UTILS_PLATFORM_SRC skia/src/utils/mac/
     SkCreateCGImageRef.cpp
     SkStream_mac.cpp
     )
@@ -576,20 +576,20 @@ endif() # MacOS X
 
 if(WIN32)
   add_definitions(-D_WIN32_WINNT=0x0600 -DSK_BUILD_FOR_WIN32)
-  include_directories(include/utils/win)
-  include_directories(src/utils/win)
+  include_directories(skia/include/utils/win)
+  include_directories(skia/src/utils/win)
 
   if (CMAKE_COMPILER_IS_GNUCC)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++0x -Wno-deprecated-declarations")
     include_directories(/mingw64/include/freetype2)
   endif()
 
-  set_prefix(SKIA_GL_PLATFORM_SRC src/gpu/gl/win/
+  set_prefix(SKIA_GL_PLATFORM_SRC skia/src/gpu/gl/win/
     GrGLCreateNativeInterface_win.cpp
     SkNativeGLContext_win.cpp
     )
 
-  set_prefix(SKIA_PORTS_SRC src/ports/
+  set_prefix(SKIA_PORTS_SRC skia/src/ports/
     SkDebug_win.cpp
     SkFontHost_win.cpp
     SkGlobalInitialization_default.cpp
@@ -600,7 +600,7 @@ if(WIN32)
     SkTLS_win.cpp
     )
 
-  set_prefix(SKIA_UTILS_PLATFORM_SRC src/utils/win/
+  set_prefix(SKIA_UTILS_PLATFORM_SRC skia/src/utils/win/
     SkAutoCoInitialize.cpp
     SkHRESULT.cpp
     SkIStream.cpp
@@ -609,7 +609,7 @@ if(WIN32)
 
   if(WINDOWS_USE_DIRECTWRITE)
     # If we're building with DirectWrite and DW only
-    set_prefix(SKIA_PORTS_2_SRC src/ports/
+    set_prefix(SKIA_PORTS_2_SRC skia/src/ports/
       SkFontMgr_default_dw.cpp
       SkFontMgr_win_dw.cpp
       SkTypeface_win_dw.cpp
@@ -617,21 +617,21 @@ if(WIN32)
       )
 
     set(SKIA_FONTS_SRC
-      src/fonts/SkFontMgr_indirect.cpp
-      src/utils/win/SkDWrite.cpp
-      src/utils/win/SkDWriteFontFileStream.cpp
-      src/utils/win/SkDWriteGeometrySink.cpp
+      skia/src/fonts/SkFontMgr_indirect.cpp
+      skia/src/utils/win/SkDWrite.cpp
+      skia/src/utils/win/SkDWriteFontFileStream.cpp
+      skia/src/utils/win/SkDWriteGeometrySink.cpp
       )
   else()
     add_definitions(-DSK_INCLUDE_FREETYPE)
-    set_prefix(SKIA_PORTS_2_SRC src/ports/
+    set_prefix(SKIA_PORTS_2_SRC skia/src/ports/
       SkFontConfigInterface_direct.cpp
       SkFontHost_FreeType.cpp
       SkFontHost_FreeType_common.cpp
       SkFontHost_fontconfig.cpp
       )
     
-    set_prefix(SKIA_FONTS_SRC src/fonts/
+    set_prefix(SKIA_FONTS_SRC skia/src/fonts/
       SkFontMgr_fontconfig.cpp
       )
   endif()
@@ -641,7 +641,7 @@ message(STATUS "Building for target: $ENV{TARGET}")
 
 if($ENV{TARGET} MATCHES ".*androideabi.*")
   add_definitions(-DSK_BUILD_FOR_ANDROID -DEGL_EGLEXT_PROTOTYPES)
-  include_directories(platform_tools/android/third_party/cpufeatures)
+  include_directories(skia/platform_tools/android/third_party/cpufeatures)
 
   # FIXME: The skia version we updated to doesn't have android FontMgr class.
   # However, this was added to skia upstream recently, so next time we update
@@ -649,12 +649,12 @@ if($ENV{TARGET} MATCHES ".*androideabi.*")
   # to the makefile.
   add_definitions(-DSK_FONTHOST_DOES_NOT_USE_FONTMGR=1)
 
-  set_prefix(SKIA_GL_PLATFORM_SRC src/gpu/gl/android/
+  set_prefix(SKIA_GL_PLATFORM_SRC skia/src/gpu/gl/android/
     GrGLCreateNativeInterface_android.cpp
     SkNativeGLContext_android.cpp
     )
 
-  set_prefix(SKIA_PORTS_SRC src/ports/
+  set_prefix(SKIA_PORTS_SRC skia/src/ports/
     SkDebug_android.cpp
     SkFontConfigInterface_android.cpp
     SkFontConfigParser_android.cpp
@@ -669,16 +669,16 @@ if($ENV{TARGET} MATCHES ".*androideabi.*")
     SkTLS_pthread.cpp
     )
 
-  set_prefix(SKIA_UTILS_PLATFORM_SRC platform_tools/android/third_party/cpufeatures/
+  set_prefix(SKIA_UTILS_PLATFORM_SRC skia/platform_tools/android/third_party/cpufeatures/
     cpu-features.c
     )
 elseif($ENV{TARGET} MATCHES ".*linux.*")
-  set_prefix(SKIA_GL_PLATFORM_SRC src/gpu/gl/unix/
+  set_prefix(SKIA_GL_PLATFORM_SRC skia/src/gpu/gl/unix/
     GrGLCreateNativeInterface_unix.cpp
     SkNativeGLContext_unix.cpp
     )
 
-  set_prefix(SKIA_PORTS_SRC src/ports/
+  set_prefix(SKIA_PORTS_SRC skia/src/ports/
     SkDebug_stdio.cpp
     SkFontConfigInterface_direct.cpp
     SkFontHost_FreeType.cpp
@@ -692,7 +692,7 @@ elseif($ENV{TARGET} MATCHES ".*linux.*")
     SkTLS_pthread.cpp
     )
 
-  set_prefix(SKIA_FONTS_SRC src/fonts/
+  set_prefix(SKIA_FONTS_SRC skia/src/fonts/
     SkFontMgr_fontconfig.cpp
     )
 endif()
@@ -746,5 +746,5 @@ endif()
 
 add_library(skia STATIC ${SKIA_SRC})
 install(TARGETS skia ARCHIVE DESTINATION lib)
-install(DIRECTORY include/ DESTINATION include)
-install(DIRECTORY src/ DESTINATION src)
+install(DIRECTORY skia/include/ DESTINATION include)
+install(DIRECTORY skia/src/ DESTINATION src)
