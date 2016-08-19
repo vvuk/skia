@@ -1,4 +1,3 @@
-
 /*
  * Copyright 2014 Google Inc.
  *
@@ -12,36 +11,6 @@
 #include "SkTSort.h"
 
 ////////////////////////////////////////////////////////////////////////////////
-
-class GrTraceMarkerSet::Iter {
-public:
-    Iter() {};
-    Iter& operator=(const Iter& i) {
-        fCurrentIndex = i.fCurrentIndex;
-        fMarkers = i.fMarkers;
-        return *this;
-    }
-    bool operator==(const Iter& i) const {
-        return fCurrentIndex == i.fCurrentIndex && fMarkers == i.fMarkers;
-    }
-    bool operator!=(const Iter& i) const { return !(*this == i); }
-    const GrGpuTraceMarker& operator*() const { return fMarkers->fMarkerArray[fCurrentIndex]; }
-    Iter& operator++() {
-        SkASSERT(*this != fMarkers->end());
-        ++fCurrentIndex;
-        return *this;
-    }
-
-private:
-    friend class GrTraceMarkerSet;
-    Iter(const GrTraceMarkerSet* markers, int index)
-            : fMarkers(markers), fCurrentIndex(index) {
-        SkASSERT(markers);
-    }
-
-    const GrTraceMarkerSet* fMarkers;
-    int fCurrentIndex;
-};
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -69,6 +38,21 @@ int GrTraceMarkerSet::count() const {
     return this->fMarkerArray.count();
 }
 
+SkString GrTraceMarkerSet::toStringLast() const {
+    const int numMarkers = this->fMarkerArray.count();
+    SkString marker_string;
+    if (numMarkers > 0) {
+        GrGpuTraceMarker& lastMarker = this->fMarkerArray[numMarkers - 1];
+        marker_string.append(lastMarker.fMarker);
+        if (lastMarker.fID != -1) {
+            marker_string.append("(");
+            marker_string.appendS32(lastMarker.fID);
+            marker_string.append(")");
+        }
+    }
+    return marker_string;
+}
+
 SkString GrTraceMarkerSet::toString() const {
     SkTQSort<GrGpuTraceMarker>(this->fMarkerArray.begin(), this->fMarkerArray.end() - 1);
     SkString marker_string;
@@ -77,7 +61,7 @@ SkString GrTraceMarkerSet::toString() const {
     int counter = 0;
     const int numMarkers = this->fMarkerArray.count();
 
-    // check used for GrGpuGL device after we've already collapsed all markers
+    // check used for GrGLGpu device after we've already collapsed all markers
     if (1 == numMarkers && -1 == this->fMarkerArray[0].fID) {
         marker_string.append(this->fMarkerArray[0].fMarker);
         return marker_string;
@@ -87,12 +71,14 @@ SkString GrTraceMarkerSet::toString() const {
         GrGpuTraceMarker& currMarker = this->fMarkerArray[i];
         const char* currCmd = currMarker.fMarker;
         if (currCmd != prevMarkerName) {
-            if (counter != 0) {
+            if (prevMarkerID != -1) {
                 marker_string.append(") ");
             }
             marker_string.append(currCmd);
-            marker_string.append("(");
-            marker_string.appendS32(currMarker.fID);
+            if (currMarker.fID != -1) {
+                marker_string.append("(");
+                marker_string.appendS32(currMarker.fID);
+            }
             prevMarkerName = currCmd;
         } else if (currMarker.fID != prevMarkerID) {
             marker_string.append(", ");
@@ -101,7 +87,7 @@ SkString GrTraceMarkerSet::toString() const {
         prevMarkerID = currMarker.fID;
         ++counter;
     }
-    if (counter > 0) {
+    if (counter > 0 && prevMarkerID != -1) {
         marker_string.append(")");
     }
     return marker_string;

@@ -1,4 +1,3 @@
-
 /*
  * Copyright 2006 The Android Open Source Project
  *
@@ -23,12 +22,10 @@ bool SkRasterizer::rasterize(const SkPath& fillPath, const SkMatrix& matrix,
 
         srcM.fFormat = SkMask::kA8_Format;
         srcM.fBounds.set(0, 0, 1, 1);
-        srcM.fImage = NULL;
         if (!filter->filterMask(&dstM, srcM, matrix, &margin)) {
             return false;
         }
-        storage = *clipBounds;
-        storage.inset(-margin.fX, -margin.fY);
+        storage = clipBounds->makeOutset(margin.fX, margin.fY);
         clipBounds = &storage;
     }
 
@@ -43,6 +40,6 @@ bool SkRasterizer::onRasterize(const SkPath& fillPath, const SkMatrix& matrix,
     SkPath  devPath;
 
     fillPath.transform(matrix, &devPath);
-    return SkDraw::DrawToMask(devPath, clipBounds, NULL, NULL, mask, mode,
+    return SkDraw::DrawToMask(devPath, clipBounds, nullptr, nullptr, mask, mode,
                               SkPaint::kFill_Style);
 }

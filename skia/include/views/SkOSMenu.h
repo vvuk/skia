@@ -10,8 +10,8 @@
 #ifndef SkOSMenu_DEFINED
 #define SkOSMenu_DEFINED
 
+#include "../private/SkTDArray.h"
 #include "SkEvent.h"
-#include "SkTDArray.h"
 
 class SkOSMenu {
 public:
@@ -129,7 +129,7 @@ public:
      */
     int appendAction(const char label[], SkEventSinkID target);
     int appendList(const char label[], const char slotName[],
-                   SkEventSinkID target, int defaultIndex, const char[] ...);
+                   SkEventSinkID target, int defaultIndex, const char* ...);
     int appendSlider(const char label[], const char slotName[],
                      SkEventSinkID target, SkScalar min, SkScalar max,
                      SkScalar defaultValue);

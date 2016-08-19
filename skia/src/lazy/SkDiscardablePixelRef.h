@@ -9,7 +9,7 @@
 #define SkDiscardablePixelRef_DEFINED
 
 #include "SkDiscardableMemory.h"
-#include "SkImageGenerator.h"
+#include "SkImageGeneratorPriv.h"
 #include "SkImageInfo.h"
 #include "SkPixelRef.h"
 
@@ -20,19 +20,23 @@
  */
 class SkDiscardablePixelRef : public SkPixelRef {
 public:
-    SK_DECLARE_INST_COUNT(SkDiscardablePixelRef)
-    SK_DECLARE_UNFLATTENABLE_OBJECT()
+    
+    SkDiscardableMemory* diagnostic_only_getDiscardable() const override {
+        return fDiscardableMemory;
+    }
 
 protected:
     ~SkDiscardablePixelRef();
 
-    virtual bool onNewLockPixels(LockRec*) SK_OVERRIDE;
-    virtual void onUnlockPixels() SK_OVERRIDE;
-    virtual bool onLockPixelsAreWritable() const SK_OVERRIDE { return false; }
+    bool onNewLockPixels(LockRec*) override;
+    void onUnlockPixels() override;
+    bool onLockPixelsAreWritable() const override { return false; }
 
-    virtual SkData* onRefEncodedData() SK_OVERRIDE {
+    SkData* onRefEncodedData() override {
         return fGenerator->refEncodedData();
     }
+
+    bool onIsLazyGenerated() const override { return true; }
 
 private:
     SkImageGenerator* const fGenerator;
@@ -42,6 +46,7 @@ private:
     // PixelRef, since the SkBitmap doesn't expect them to change.
 
     SkDiscardableMemory* fDiscardableMemory;
+    bool                 fDiscardableMemoryIsLocked;
     SkAutoTUnref<SkColorTable> fCTable;
 
     /* Takes ownership of SkImageGenerator. */
@@ -49,7 +54,25 @@ private:
                           size_t rowBytes,
                           SkDiscardableMemory::Factory* factory);
 
-    friend bool SkInstallDiscardablePixelRef(SkImageGenerator*, SkBitmap*,
+    bool onQueryYUV8(SkYUVSizeInfo* sizeInfo, SkYUVColorSpace* colorSpace) const override {
+        // If the image was already decoded with lockPixels(), favor not
+        // re-decoding to YUV8 planes.
+        if (fDiscardableMemory) {
+            return false;
+        }
+        return fGenerator->queryYUV8(sizeInfo, colorSpace);
+    }
+
+    bool onGetYUV8Planes(const SkYUVSizeInfo& sizeInfo, void* planes[3]) override {
+        // If the image was already decoded with lockPixels(), favor not
+        // re-decoding to YUV8 planes.
+        if (fDiscardableMemory) {
+            return false;
+        }
+        return fGenerator->getYUV8Planes(sizeInfo, planes);
+    }
+
+    friend bool SkDEPRECATED_InstallDiscardablePixelRef(SkImageGenerator*, const SkIRect*, SkBitmap*,
                                              SkDiscardableMemory::Factory*);
 
     typedef SkPixelRef INHERITED;

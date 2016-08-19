@@ -16,7 +16,7 @@
 #import  "SkEventNotifier.h"
 #define  kINVAL_NSVIEW_EventType "inval-nsview"
 
-SK_COMPILE_ASSERT(SK_SUPPORT_GPU, not_implemented_for_non_gpu_build);
+static_assert(SK_SUPPORT_GPU, "not_implemented_for_non_gpu_build");
 
 SkOSWindow::SkOSWindow(void* hWnd) : fHWND(hWnd) {
     fInvalEventIsPending = false;
@@ -69,12 +69,26 @@ bool SkOSWindow::attach(SkBackEndTypes attachType, int sampleCount, AttachmentIn
     return [(SkNSView*)fHWND attach:attachType withMSAASampleCount:sampleCount andGetInfo:info];
 }
 
-void SkOSWindow::detach() {
+void SkOSWindow::release() {
     [(SkNSView*)fHWND detach];
 }
 
 void SkOSWindow::present() {
     [(SkNSView*)fHWND present];
 }
+
+void SkOSWindow::closeWindow() {
+    [[(SkNSView*)fHWND window] close];
+}
+
+void SkOSWindow::setVsync(bool enable) {
+    [(SkNSView*)fHWND setVSync:enable];
+}
+
+bool SkOSWindow::makeFullscreen() {
+    [(SkNSView*)fHWND enterFullScreenMode:[NSScreen mainScreen] withOptions:nil];
+    return true;
+}
+
 
 #endif

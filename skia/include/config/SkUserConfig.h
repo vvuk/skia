@@ -58,20 +58,6 @@
 //#define SK_DEBUG_GLYPH_CACHE
 //#define SK_DEBUG_PATH
 
-/*  To assist debugging, Skia provides an instance counting utility in
-    include/core/SkInstCount.h. This flag turns on and off that utility to
-    allow instance count tracking in either debug or release builds. By
-    default it is enabled in debug but disabled in release.
- */
-//#define SK_ENABLE_INST_COUNT 1
-
-/*  If, in debugging mode, Skia needs to stop (presumably to invoke a debugger)
-    it will call SK_CRASH(). If this is not defined it, it is defined in
-    SkPostConfig.h to write to an illegal address
- */
-//#define SK_CRASH() *(int *)(uintptr_t)0 = 0
-
-
 /*  preconfig will have attempted to determine the endianness of the system,
     but you can change these mutually exclusive flags here.
  */
@@ -98,7 +84,7 @@
  *  To specify a different default font cache limit, define this. If this is
  *  undefined, skia will use a built-in value.
  */
-#define SK_DEFAULT_FONT_CACHE_LIMIT   (12 * 1024 * 1024)
+//#define SK_DEFAULT_FONT_CACHE_LIMIT   (1024 * 1024)
 
 /*
  *  To specify the default size of the image cache, undefine this and set it to
@@ -106,19 +92,6 @@
  *  value as well. If this is undefined, a built-in value will be used.
  */
 //#define SK_DEFAULT_IMAGE_CACHE_LIMIT (1024 * 1024)
-
-/*  If zlib is available and you want to support the flate compression
-    algorithm (used in PDF generation), define SK_ZLIB_INCLUDE to be the
-    include path. Alternatively, define SK_SYSTEM_ZLIB to use the system zlib
-    library specified as "#include <zlib.h>".
- */
-//#define SK_ZLIB_INCLUDE <zlib.h>
-//#define SK_SYSTEM_ZLIB
-
-/*  Define this to allow PDF scalars above 32k.  The PDF/A spec doesn't allow
-    them, but modern PDF interpreters should handle them just fine.
- */
-//#define SK_ALLOW_LARGE_PDF_SCALARS
 
 /*  Define this to provide font subsetter in PDF generation.
  */
@@ -141,12 +114,12 @@
 
 /*  Change the ordering to work in X windows.
  */
-#ifdef SK_SAMPLES_FOR_X
-        #define SK_R32_SHIFT    16
-        #define SK_G32_SHIFT    8
-        #define SK_B32_SHIFT    0
-        #define SK_A32_SHIFT    24
-#endif
+//#ifdef SK_SAMPLES_FOR_X
+//        #define SK_R32_SHIFT    16
+//        #define SK_G32_SHIFT    8
+//        #define SK_B32_SHIFT    0
+//        #define SK_A32_SHIFT    24
+//#endif
 
 
 /* Determines whether to build code that supports the GPU backend. Some classes
@@ -158,24 +131,50 @@
  */
 //#define SK_SUPPORT_GPU 1
 
-
-/* The PDF generation code uses Path Ops to generate inverse fills and complex
- * clipping paths, but at this time, Path Ops is not release ready yet. So,
- * the code is hidden behind this #define guard. If you are feeling adventurous
- * and want the latest and greatest PDF generation code, uncomment the #define.
- * When Path Ops is release ready, the define guards and this user config
- * define should be removed entirely.
+/* Skia makes use of histogram logging macros to trace the frequency of
+ * events. By default, Skia provides no-op versions of these macros.
+ * Skia consumers can provide their own definitions of these macros to
+ * integrate with their histogram collection backend.
  */
-//#define SK_PDF_USE_PATHOPS
+//#define SK_HISTOGRAM_BOOLEAN(name, value)
+//#define SK_HISTOGRAM_ENUMERATION(name, value, boundary_value)
 
-/* Skia uses these defines as the target of include preprocessor directives.
- * The header files pointed to by these defines provide declarations and
- * possibly inline implementations of threading primitives.
- *
- * See SkThread.h for documentation on what these includes must contain.
- */
-//#define SK_ATOMICS_PLATFORM_H "SkAtomics_xxx.h"
-//#define SK_MUTEX_PLATFORM_H "SkMutex_xxx.h"
-//#define SK_BARRIERS_PLATFORM_H "SkBarriers_xxx.h"
+// On all platforms we have this byte order
+#define SK_A32_SHIFT 24
+#define SK_R32_SHIFT 16
+#define SK_G32_SHIFT 8
+#define SK_B32_SHIFT 0
+
+#define SK_ALLOW_STATIC_GLOBAL_INITIALIZERS 0
+
+#define SK_SUPPORT_LEGACY_GETDEVICE
+#define SK_SUPPORT_LEGACY_GETTOPDEVICE
+
+#define SK_IGNORE_ETC1_SUPPORT
+
+#define SK_RASTERIZE_EVEN_ROUNDING
+
+#define SK_DISABLE_SLOW_DEBUG_VALIDATION 1
+
+#define MOZ_SKIA 1
+
+#ifndef MOZ_IMPLICIT
+#  ifdef MOZ_CLANG_PLUGIN
+#    define MOZ_IMPLICIT __attribute__((annotate("moz_implicit")))
+#  else
+#    define MOZ_IMPLICIT
+#  endif
+#endif
+
+/* Check if building with either MSVC, libc++, or a sufficiently recent version of libstdc++.
++ * On platforms like OS X 10.6 or older Android SDKs, we need to work around a lack of certain
++ * C++11 features.
++ */
+#include "mozilla/Compiler.h"
+#if MOZ_IS_MSVC || MOZ_USING_LIBCXX || MOZ_LIBSTDCXX_VERSION_AT_LEAST(4, 8, 0)
+#  define MOZ_SKIA_AVOID_CXX11 0
+#else
+#  define MOZ_SKIA_AVOID_CXX11 1
+#endif
 
 #endif

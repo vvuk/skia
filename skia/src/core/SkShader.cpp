@@ -5,16 +5,17 @@
  * found in the LICENSE file.
  */
 
+#include "SkAtomics.h"
 #include "SkBitmapProcShader.h"
+#include "SkColorShader.h"
 #include "SkEmptyShader.h"
-#include "SkReadBuffer.h"
 #include "SkMallocPixelRef.h"
 #include "SkPaint.h"
 #include "SkPicture.h"
 #include "SkPictureShader.h"
+#include "SkReadBuffer.h"
 #include "SkScalar.h"
 #include "SkShader.h"
-#include "SkThread.h"
 #include "SkWriteBuffer.h"
 
 //#define SK_TRACK_SHADER_LIFETIME
@@ -43,15 +44,8 @@ SkShader::SkShader(const SkMatrix* localMatrix) {
     } else {
         fLocalMatrix.reset();
     }
-}
-
-SkShader::SkShader(SkReadBuffer& buffer) : INHERITED(buffer) {
-    inc_shader_counter();
-    if (buffer.readBool()) {
-        buffer.readMatrix(&fLocalMatrix);
-    } else {
-        fLocalMatrix.reset();
-    }
+    // Pre-cache so future calls to fLocalMatrix.getType() are threadsafe.
+    (void)fLocalMatrix.getType();
 }
 
 SkShader::~SkShader() {
@@ -79,18 +73,34 @@ bool SkShader::computeTotalInverse(const ContextRec& rec, SkMatrix* totalInverse
     return m->invert(totalInverse);
 }
 
+bool SkShader::asLuminanceColor(SkColor* colorPtr) const {
+    SkColor storage;
+    if (nullptr == colorPtr) {
+        colorPtr = &storage;
+    }
+    if (this->onAsLuminanceColor(colorPtr)) {
+        *colorPtr = SkColorSetA(*colorPtr, 0xFF);   // we only return opaque
+        return true;
+    }
+    return false;
+}
+
 SkShader::Context* SkShader::createContext(const ContextRec& rec, void* storage) const {
-    if (!this->computeTotalInverse(rec, NULL)) {
-        return NULL;
+    if (!this->computeTotalInverse(rec, nullptr)) {
+        return nullptr;
     }
     return this->onCreateContext(rec, storage);
 }
 
 SkShader::Context* SkShader::onCreateContext(const ContextRec& rec, void*) const {
-    return NULL;
+    return nullptr;
 }
 
-size_t SkShader::contextSize() const {
+size_t SkShader::contextSize(const ContextRec& rec) const {
+    return this->onContextSize(rec);
+}
+
+size_t SkShader::onContextSize(const ContextRec&) const {
     return 0;
 }
 
@@ -108,19 +118,25 @@ SkShader::Context::Context(const SkShader& shader, const ContextRec& rec)
 SkShader::Context::~Context() {}
 
 SkShader::Context::ShadeProc SkShader::Context::asAShadeProc(void** ctx) {
-    return NULL;
+    return nullptr;
+}
+
+void SkShader::Context::shadeSpan4f(int x, int y, SkPM4f dst[], int count) {
+    const int N = 128;
+    SkPMColor tmp[N];
+    while (count > 0) {
+        int n = SkTMin(count, N);
+        this->shadeSpan(x, y, tmp, n);
+        for (int i = 0; i < n; ++i) {
+            dst[i] = SkPM4f::FromPMColor(tmp[i]);
+        }
+        dst += n;
+        x += n;
+        count -= n;
+    }
 }
 
 #include "SkColorPriv.h"
-
-void SkShader::Context::shadeSpan16(int x, int y, uint16_t span16[], int count) {
-    SkASSERT(span16);
-    SkASSERT(count > 0);
-    SkASSERT(this->canCallShadeSpan16());
-
-    // basically, if we get here, the subclass screwed up
-    SkDEBUGFAIL("kHasSpan16 flag is set, but shadeSpan16() not implemented");
-}
 
 #define kTempColorQuadCount 6   // balance between speed (larger) and saving stack-space
 #define kTempColorCount     (kTempColorQuadCount << 2)
@@ -189,7 +205,7 @@ SkShader::Context::MatrixClass SkShader::Context::ComputeMatrixClass(const SkMat
     MatrixClass mc = kLinear_MatrixClass;
 
     if (mat.hasPerspective()) {
-        if (mat.fixedStepInX(0, NULL, NULL)) {
+        if (mat.isFixedStepInX()) {
             mc = kFixedStepInX_MatrixClass;
         } else {
             mc = kPerspective_MatrixClass;
@@ -200,36 +216,31 @@ SkShader::Context::MatrixClass SkShader::Context::ComputeMatrixClass(const SkMat
 
 //////////////////////////////////////////////////////////////////////////////
 
-SkShader::BitmapType SkShader::asABitmap(SkBitmap*, SkMatrix*, TileMode*) const {
-    return kNone_BitmapType;
-}
-
 SkShader::GradientType SkShader::asAGradient(GradientInfo* info) const {
     return kNone_GradientType;
 }
 
-bool SkShader::asNewEffect(GrContext* context, const SkPaint& paint,
-                           const SkMatrix* localMatrixOrNull, GrColor* grColor,
-                           GrEffectRef** grEffect)  const {
-    return false;
+const GrFragmentProcessor* SkShader::asFragmentProcessor(GrContext*, const SkMatrix&,
+                                                         const SkMatrix*, SkFilterQuality)  const {
+    return nullptr;
 }
 
 SkShader* SkShader::refAsALocalMatrixShader(SkMatrix*) const {
-    return NULL;
+    return nullptr;
 }
 
-SkShader* SkShader::CreateEmptyShader() {
-    return SkNEW(SkEmptyShader);
+sk_sp<SkShader> SkShader::MakeEmptyShader() { return sk_make_sp<SkEmptyShader>(); }
+
+sk_sp<SkShader> SkShader::MakeColorShader(SkColor color) { return sk_make_sp<SkColorShader>(color); }
+
+sk_sp<SkShader> SkShader::MakeBitmapShader(const SkBitmap& src, TileMode tmx, TileMode tmy,
+                                           const SkMatrix* localMatrix) {
+    return SkMakeBitmapShader(src, tmx, tmy, localMatrix, nullptr);
 }
 
-SkShader* SkShader::CreateBitmapShader(const SkBitmap& src, TileMode tmx, TileMode tmy,
-                                       const SkMatrix* localMatrix) {
-    return ::CreateBitmapShader(src, tmx, tmy, localMatrix, NULL);
-}
-
-SkShader* SkShader::CreatePictureShader(SkPicture* src, TileMode tmx, TileMode tmy,
-                                       const SkMatrix* localMatrix) {
-    return SkPictureShader::Create(src, tmx, tmy, localMatrix);
+sk_sp<SkShader> SkShader::MakePictureShader(sk_sp<SkPicture> src, TileMode tmx, TileMode tmy,
+                                            const SkMatrix* localMatrix, const SkRect* tile) {
+    return SkPictureShader::Make(std::move(src), tmx, tmy, localMatrix, tile);
 }
 
 #ifndef SK_IGNORE_TO_STRING
@@ -243,7 +254,6 @@ void SkShader::toString(SkString* str) const {
 
 //////////////////////////////////////////////////////////////////////////////
 
-#include "SkColorShader.h"
 #include "SkUtils.h"
 
 SkColorShader::SkColorShader(SkColor c)
@@ -254,21 +264,11 @@ bool SkColorShader::isOpaque() const {
     return SkColorGetA(fColor) == 255;
 }
 
-SkColorShader::SkColorShader(SkReadBuffer& b) : INHERITED(b) {
-    // V25_COMPATIBILITY_CODE We had a boolean to make the color shader inherit the paint's
-    // color. We don't support that any more.
-    if (b.isVersionLT(SkReadBuffer::kColorShaderNoBool_Version)) {
-        if (b.readBool()) {
-            SkDEBUGFAIL("We shouldn't have pictures that recorded the inherited case.");
-            fColor = SK_ColorWHITE;
-            return;
-        }
-    }
-    fColor = b.readColor();
+sk_sp<SkFlattenable> SkColorShader::CreateProc(SkReadBuffer& buffer) {
+    return sk_make_sp<SkColorShader>(buffer.readColor());
 }
 
 void SkColorShader::flatten(SkWriteBuffer& buffer) const {
-    this->INHERITED::flatten(buffer);
     buffer.writeColor(fColor);
 }
 
@@ -276,12 +276,8 @@ uint32_t SkColorShader::ColorShaderContext::getFlags() const {
     return fFlags;
 }
 
-uint8_t SkColorShader::ColorShaderContext::getSpan16Alpha() const {
-    return SkGetPackedA32(fPMColor);
-}
-
 SkShader::Context* SkColorShader::onCreateContext(const ContextRec& rec, void* storage) const {
-    return SkNEW_PLACEMENT_ARGS(storage, ColorShaderContext, (*this, rec));
+    return new (storage) ColorShaderContext(*this, rec);
 }
 
 SkColorShader::ColorShaderContext::ColorShaderContext(const SkColorShader& shader,
@@ -295,9 +291,6 @@ SkColorShader::ColorShaderContext::ColorShaderContext(const SkColorShader& shade
     unsigned g = SkColorGetG(color);
     unsigned b = SkColorGetB(color);
 
-    // we want this before we apply any alpha
-    fColor16 = SkPack888ToRGB16(r, g, b);
-
     if (a != 255) {
         r = SkMulDiv255Round(r, a);
         g = SkMulDiv255Round(g, a);
@@ -305,12 +298,13 @@ SkColorShader::ColorShaderContext::ColorShaderContext(const SkColorShader& shade
     }
     fPMColor = SkPackARGB32(a, r, g, b);
 
+    SkColor4f c4 = SkColor4f::FromColor(shader.fColor);
+    c4.fA *= rec.fPaint->getAlpha() / 255.0f;
+    fPM4f = c4.premul();
+
     fFlags = kConstInY32_Flag;
     if (255 == a) {
         fFlags |= kOpaqueAlpha_Flag;
-        if (rec.fPaint->isDither() == false) {
-            fFlags |= kHasSpan16_Flag;
-        }
     }
 }
 
@@ -318,18 +312,14 @@ void SkColorShader::ColorShaderContext::shadeSpan(int x, int y, SkPMColor span[]
     sk_memset32(span, fPMColor, count);
 }
 
-void SkColorShader::ColorShaderContext::shadeSpan16(int x, int y, uint16_t span[], int count) {
-    sk_memset16(span, fColor16, count);
-}
-
 void SkColorShader::ColorShaderContext::shadeSpanAlpha(int x, int y, uint8_t alpha[], int count) {
     memset(alpha, SkGetPackedA32(fPMColor), count);
 }
 
-// if we had a asAColor method, that would be more efficient...
-SkShader::BitmapType SkColorShader::asABitmap(SkBitmap* bitmap, SkMatrix* matrix,
-                                              TileMode modes[]) const {
-    return kNone_BitmapType;
+void SkColorShader::ColorShaderContext::shadeSpan4f(int x, int y, SkPM4f span[], int count) {
+    for (int i = 0; i < count; ++i) {
+        span[i] = fPM4f;
+    }
 }
 
 SkShader::GradientType SkColorShader::asAGradient(GradientInfo* info) const {
@@ -346,24 +336,12 @@ SkShader::GradientType SkColorShader::asAGradient(GradientInfo* info) const {
 #if SK_SUPPORT_GPU
 
 #include "SkGr.h"
-
-bool SkColorShader::asNewEffect(GrContext* context, const SkPaint& paint,
-                                const SkMatrix* localMatrix, GrColor* grColor,
-                                GrEffectRef** grEffect) const {
-    *grEffect = NULL;
-    SkColor skColor = fColor;
-    U8CPU newA = SkMulDiv255Round(SkColorGetA(fColor), paint.getAlpha());
-    *grColor = SkColor2GrColor(SkColorSetA(skColor, newA));
-    return true;
-}
-
-#else
-
-bool SkColorShader::asNewEffect(GrContext* context, const SkPaint& paint,
-                                     const SkMatrix* localMatrix, GrColor* grColor,
-                                     GrEffectRef** grEffect) const {
-    SkDEBUGFAIL("Should not call in GPU-less build");
-    return false;
+#include "effects/GrConstColorProcessor.h"
+const GrFragmentProcessor* SkColorShader::asFragmentProcessor(GrContext*, const SkMatrix&,
+                                                              const SkMatrix*,
+                                                              SkFilterQuality) const {
+    GrColor color = SkColorToPremulGrColor(fColor);
+    return GrConstColorProcessor::Create(color, GrConstColorProcessor::kModulateA_InputMode);
 }
 
 #endif
@@ -383,6 +361,68 @@ void SkColorShader::toString(SkString* str) const {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+static void D32_BlitBW(SkShader::Context::BlitState* state, int x, int y, const SkPixmap& dst,
+                       int count) {
+    SkXfermode::D32Proc proc = (SkXfermode::D32Proc)state->fStorage[0];
+    const SkPM4f* src = (const SkPM4f*)state->fStorage[1];
+    proc(state->fXfer, dst.writable_addr32(x, y), src, count, nullptr);
+}
+
+static void D32_BlitAA(SkShader::Context::BlitState* state, int x, int y, const SkPixmap& dst,
+                       int count, const SkAlpha aa[]) {
+    SkXfermode::D32Proc proc = (SkXfermode::D32Proc)state->fStorage[0];
+    const SkPM4f* src = (const SkPM4f*)state->fStorage[1];
+    proc(state->fXfer, dst.writable_addr32(x, y), src, count, aa);
+}
+
+static void D64_BlitBW(SkShader::Context::BlitState* state, int x, int y, const SkPixmap& dst,
+                       int count) {
+    SkXfermode::D64Proc proc = (SkXfermode::D64Proc)state->fStorage[0];
+    const SkPM4f* src = (const SkPM4f*)state->fStorage[1];
+    proc(state->fXfer, dst.writable_addr64(x, y), src, count, nullptr);
+}
+
+static void D64_BlitAA(SkShader::Context::BlitState* state, int x, int y, const SkPixmap& dst,
+                       int count, const SkAlpha aa[]) {
+    SkXfermode::D64Proc proc = (SkXfermode::D64Proc)state->fStorage[0];
+    const SkPM4f* src = (const SkPM4f*)state->fStorage[1];
+    proc(state->fXfer, dst.writable_addr64(x, y), src, count, aa);
+}
+
+bool SkColorShader::ColorShaderContext::onChooseBlitProcs(const SkImageInfo& info,
+                                                          BlitState* state) {
+    uint32_t flags = SkXfermode::kSrcIsSingle_D32Flag;
+    if (fPM4f.a() == 1) {
+        flags |= SkXfermode::kSrcIsOpaque_D32Flag;
+    }
+    switch (info.colorType()) {
+        case kN32_SkColorType:
+            if (info.isSRGB()) {
+                flags |= SkXfermode::kDstIsSRGB_D32Flag;
+            }
+            state->fStorage[0] = (void*)SkXfermode::GetD32Proc(state->fXfer, flags);
+            state->fStorage[1] = &fPM4f;
+            state->fBlitBW = D32_BlitBW;
+            state->fBlitAA = D32_BlitAA;
+            return true;
+        case kRGBA_F16_SkColorType:
+            flags |= SkXfermode::kDstIsFloat16_D64Flag;
+            state->fStorage[0] = (void*)SkXfermode::GetD64Proc(state->fXfer, flags);
+            state->fStorage[1] = &fPM4f;
+            state->fBlitBW = D64_BlitBW;
+            state->fBlitAA = D64_BlitAA;
+            return true;
+        default:
+            return false;
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+sk_sp<SkFlattenable> SkEmptyShader::CreateProc(SkReadBuffer&) {
+    return SkShader::MakeEmptyShader();
+}
+
 #ifndef SK_IGNORE_TO_STRING
 #include "SkEmptyShader.h"
 
@@ -392,5 +432,32 @@ void SkEmptyShader::toString(SkString* str) const {
     this->INHERITED::toString(str);
 
     str->append(")");
+}
+#endif
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+#ifdef SK_SUPPORT_LEGACY_CREATESHADER_PTR
+SkShader* SkShader::CreateComposeShader(SkShader* dst, SkShader* src, SkXfermode::Mode mode) {
+    return MakeComposeShader(sk_ref_sp(dst), sk_ref_sp(src), mode).release();
+}
+SkShader* SkShader::CreateComposeShader(SkShader* dst, SkShader* src, SkXfermode* xfer) {
+    return MakeComposeShader(sk_ref_sp(dst), sk_ref_sp(src), xfer).release();
+}
+SkShader* SkShader::CreatePictureShader(const SkPicture* src, TileMode tmx, TileMode tmy,
+                                     const SkMatrix* localMatrix, const SkRect* tile) {
+    return MakePictureShader(sk_ref_sp(const_cast<SkPicture*>(src)), tmx, tmy,
+                             localMatrix, tile).release();
+}
+SkShader* SkShader::newWithColorFilter(SkColorFilter* filter) const {
+    return this->makeWithColorFilter(sk_ref_sp(filter)).release();
+}
+#endif
+
+#ifdef SK_SUPPORT_LEGACY_XFERMODE_PTR
+#include "SkXfermode.h"
+sk_sp<SkShader> SkShader::MakeComposeShader(sk_sp<SkShader> dst, sk_sp<SkShader> src,
+                                            SkXfermode* xfer) {
+    return MakeComposeShader(std::move(dst), std::move(src), sk_ref_sp(xfer));
 }
 #endif

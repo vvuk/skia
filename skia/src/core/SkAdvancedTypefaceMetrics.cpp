@@ -1,4 +1,3 @@
-
 /*
  * Copyright 2011 Google Inc.
  *
@@ -14,11 +13,9 @@
 #include <dwrite.h>
 #endif
 
-#if defined(SK_BUILD_FOR_UNIX) || defined(SK_BUILD_FOR_ANDROID) || defined(SK_INCLUDE_FREETYPE)
 // forward declare structs needed for getAdvanceData() template for freetype
-struct FT_FaceRec;
+struct FT_FaceRec_;
 typedef struct FT_FaceRec_* FT_Face;
-#endif
 
 #ifdef SK_BUILD_FOR_MAC
 #import <ApplicationServices/ApplicationServices.h>
@@ -68,9 +65,9 @@ void resetRange(SkAdvancedTypefaceMetrics::AdvanceMetric<Data>* range,
     range->fAdvance.setCount(0);
 }
 
-template <typename Data>
+template <typename Data, template<typename> class AutoTDelete>
 SkAdvancedTypefaceMetrics::AdvanceMetric<Data>* appendRange(
-        SkAutoTDelete<SkAdvancedTypefaceMetrics::AdvanceMetric<Data> >* nextSlot,
+        AutoTDelete<SkAdvancedTypefaceMetrics::AdvanceMetric<Data> >* nextSlot,
         int startId) {
     nextSlot->reset(new SkAdvancedTypefaceMetrics::AdvanceMetric<Data>);
     resetRange(nextSlot->get(), startId);
@@ -148,7 +145,7 @@ SkAdvancedTypefaceMetrics::AdvanceMetric<Data>* getAdvanceData(
 
     SkAutoTDelete<SkAdvancedTypefaceMetrics::AdvanceMetric<Data> > result;
     SkAdvancedTypefaceMetrics::AdvanceMetric<Data>* curRange;
-    SkAdvancedTypefaceMetrics::AdvanceMetric<Data>* prevRange = NULL;
+    SkAdvancedTypefaceMetrics::AdvanceMetric<Data>* prevRange = nullptr;
     Data lastAdvance = kInvalidAdvance;
     int repeatedAdvances = 0;
     int wildCardsInRun = 0;
@@ -168,7 +165,7 @@ SkAdvancedTypefaceMetrics::AdvanceMetric<Data>* getAdvanceData(
     for (int gId = firstIndex; gId <= lastIndex; gId++) {
         Data advance = kInvalidAdvance;
         if (gId < lastIndex) {
-            // Get glyph id only when subset is NULL, or the id is in subset.
+            // Get glyph id only when subset is nullptr, or the id is in subset.
             SkASSERT(!subsetGlyphIDs || (subsetIndex < subsetGlyphIDsLength &&
                     static_cast<uint32_t>(gId) <= subsetGlyphIDs[subsetIndex]));
             if (!subsetGlyphIDs ||
@@ -245,16 +242,23 @@ SkAdvancedTypefaceMetrics::AdvanceMetric<Data>* getAdvanceData(
     if (curRange->fStartId == lastIndex) {
         SkASSERT(prevRange);
         SkASSERT(prevRange->fNext->fStartId == lastIndex);
-        prevRange->fNext.free();
+        prevRange->fNext.reset();
     } else {
         finishRange(curRange, lastIndex - 1,
                     SkAdvancedTypefaceMetrics::WidthRange::kRange);
     }
-    return result.detach();
+    return result.release();
 }
 
 // Make AdvanceMetric template functions available for linking with typename
 // WidthRange and VerticalAdvanceRange.
+template SkAdvancedTypefaceMetrics::WidthRange* getAdvanceData(
+        FT_Face face,
+        int num_glyphs,
+        const uint32_t* subsetGlyphIDs,
+        uint32_t subsetGlyphIDsLength,
+        bool (*getAdvance)(FT_Face face, int gId, int16_t* data));
+
 #if defined(SK_BUILD_FOR_WIN)
 template SkAdvancedTypefaceMetrics::WidthRange* getAdvanceData(
         HDC hdc,
@@ -268,15 +272,6 @@ template SkAdvancedTypefaceMetrics::WidthRange* getAdvanceData(
         const uint32_t* subsetGlyphIDs,
         uint32_t subsetGlyphIDsLength,
         bool (*getAdvance)(IDWriteFontFace* fontFace, int gId, int16_t* data));
-#endif
-
-#if defined(SK_BUILD_FOR_UNIX) || defined(SK_BUILD_FOR_ANDROID) || defined(SK_INCLUDE_FREETYPE)
-template SkAdvancedTypefaceMetrics::WidthRange* getAdvanceData(
-        FT_Face face,
-        int num_glyphs,
-        const uint32_t* subsetGlyphIDs,
-        uint32_t subsetGlyphIDsLength,
-        bool (*getAdvance)(FT_Face face, int gId, int16_t* data));
 #elif defined(SK_BUILD_FOR_MAC) || defined(SK_BUILD_FOR_IOS)
 template SkAdvancedTypefaceMetrics::WidthRange* getAdvanceData(
         CTFontRef ctFont,

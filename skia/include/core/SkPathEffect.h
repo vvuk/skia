@@ -14,10 +14,9 @@
 #include "SkPath.h"
 #include "SkPoint.h"
 #include "SkRect.h"
-#include "SkStrokeRec.h"
-#include "SkTDArray.h"
 
 class SkPath;
+class SkStrokeRec;
 
 /** \class SkPathEffect
 
@@ -29,8 +28,6 @@ class SkPath;
 */
 class SK_API SkPathEffect : public SkFlattenable {
 public:
-    SK_DECLARE_INST_COUNT(SkPathEffect)
-
     /**
      *  Given a src path (input) and a stroke-rec (input and output), apply
      *  this effect to the src path, returning the new path in dst, and return
@@ -131,11 +128,16 @@ public:
 
     virtual DashType asADash(DashInfo* info) const;
 
+    SK_TO_STRING_PUREVIRT()
     SK_DEFINE_FLATTENABLE_TYPE(SkPathEffect)
+
+#ifdef SK_BUILD_FOR_ANDROID_FRAMEWORK
+    /// Override for subclasses as appropriate.
+    virtual bool exposedInAndroidJavaAPI() const { return false; }
+#endif
 
 protected:
     SkPathEffect() {}
-    SkPathEffect(SkReadBuffer& buffer) : INHERITED(buffer) {}
 
 private:
     // illegal
@@ -152,16 +154,16 @@ private:
     for managing the lifetimes of its two arguments.
 */
 class SkPairPathEffect : public SkPathEffect {
-public:
-    virtual ~SkPairPathEffect();
-
 protected:
-    SkPairPathEffect(SkPathEffect* pe0, SkPathEffect* pe1);
-    SkPairPathEffect(SkReadBuffer&);
-    virtual void flatten(SkWriteBuffer&) const SK_OVERRIDE;
+    SkPairPathEffect(sk_sp<SkPathEffect> pe0, sk_sp<SkPathEffect> pe1);
+
+    void flatten(SkWriteBuffer&) const override;
 
     // these are visible to our subclasses
-    SkPathEffect* fPE0, *fPE1;
+    sk_sp<SkPathEffect> fPE0;
+    sk_sp<SkPathEffect> fPE1;
+
+    SK_TO_STRING_OVERRIDE()
 
 private:
     typedef SkPathEffect INHERITED;
@@ -179,19 +181,35 @@ public:
         The reference counts for outer and inner are both incremented in the constructor,
         and decremented in the destructor.
     */
-    static SkComposePathEffect* Create(SkPathEffect* outer, SkPathEffect* inner) {
-        return SkNEW_ARGS(SkComposePathEffect, (outer, inner));
+    static sk_sp<SkPathEffect> Make(sk_sp<SkPathEffect> outer, sk_sp<SkPathEffect> inner) {
+        if (!outer) {
+            return inner;
+        }
+        if (!inner) {
+            return outer;
+        }
+        return sk_sp<SkPathEffect>(new SkComposePathEffect(outer, inner));
     }
 
-    virtual bool filterPath(SkPath* dst, const SkPath& src,
-                            SkStrokeRec*, const SkRect*) const SK_OVERRIDE;
+#ifdef SK_SUPPORT_LEGACY_PATHEFFECT_PTR
+    static SkPathEffect* Create(SkPathEffect* outer, SkPathEffect* inner) {
+        return Make(sk_ref_sp(outer), sk_ref_sp(inner)).release();
+    }
+#endif
 
+    virtual bool filterPath(SkPath* dst, const SkPath& src,
+                            SkStrokeRec*, const SkRect*) const override;
+
+    SK_TO_STRING_OVERRIDE()
     SK_DECLARE_PUBLIC_FLATTENABLE_DESERIALIZATION_PROCS(SkComposePathEffect)
 
+#ifdef SK_BUILD_FOR_ANDROID_FRAMEWORK
+    bool exposedInAndroidJavaAPI() const override { return true; }
+#endif
+
 protected:
-    SkComposePathEffect(SkPathEffect* outer, SkPathEffect* inner)
+    SkComposePathEffect(sk_sp<SkPathEffect> outer, sk_sp<SkPathEffect> inner)
         : INHERITED(outer, inner) {}
-    explicit SkComposePathEffect(SkReadBuffer& buffer) : INHERITED(buffer) {}
 
 private:
     // illegal
@@ -213,19 +231,34 @@ public:
         The reference counts for first and second are both incremented in the constructor,
         and decremented in the destructor.
     */
-    static SkSumPathEffect* Create(SkPathEffect* first, SkPathEffect* second) {
-        return SkNEW_ARGS(SkSumPathEffect, (first, second));
+    static sk_sp<SkPathEffect> Make(sk_sp<SkPathEffect> first, sk_sp<SkPathEffect> second) {
+        if (!first) {
+            return second;
+        }
+        if (!second) {
+            return first;
+        }
+        return sk_sp<SkPathEffect>(new SkSumPathEffect(first, second));
     }
 
+#ifdef SK_SUPPORT_LEGACY_PATHEFFECT_PTR
+    static SkPathEffect* Create(SkPathEffect* first, SkPathEffect* second) {
+        return Make(sk_ref_sp(first), sk_ref_sp(second)).release();
+    }
+#endif
     virtual bool filterPath(SkPath* dst, const SkPath& src,
-                            SkStrokeRec*, const SkRect*) const SK_OVERRIDE;
+                            SkStrokeRec*, const SkRect*) const override;
 
+    SK_TO_STRING_OVERRIDE()
     SK_DECLARE_PUBLIC_FLATTENABLE_DESERIALIZATION_PROCS(SkSumPathEffect)
 
+#ifdef SK_BUILD_FOR_ANDROID_FRAMEWORK
+    bool exposedInAndroidJavaAPI() const override { return true; }
+#endif
+
 protected:
-    SkSumPathEffect(SkPathEffect* first, SkPathEffect* second)
+    SkSumPathEffect(sk_sp<SkPathEffect> first, sk_sp<SkPathEffect> second)
         : INHERITED(first, second) {}
-    explicit SkSumPathEffect(SkReadBuffer& buffer) : INHERITED(buffer) {}
 
 private:
     // illegal

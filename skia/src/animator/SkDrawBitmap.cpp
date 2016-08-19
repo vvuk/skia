@@ -10,7 +10,8 @@
 #include "SkDrawBitmap.h"
 #include "SkAnimateMaker.h"
 #include "SkCanvas.h"
-#include "SkImageDecoder.h"
+#include "SkData.h"
+#include "SkImage.h"
 #include "SkPaint.h"
 #include "SkStream.h"
 
@@ -56,7 +57,7 @@ const SkMemberInfo SkDrawBitmap::fInfo[] = {
 
 DEFINE_GET_MEMBER(SkDrawBitmap);
 
-SkDrawBitmap::SkDrawBitmap() : format((SkBitmap::Config) -1), height(-1),
+SkDrawBitmap::SkDrawBitmap() : format((SkColorType) -1), height(-1),
     rowBytes(0),    width(-1), fColor(0), fColorSet(false) {
 }
 
@@ -88,9 +89,9 @@ void SkDrawBitmap::onEndElement(SkAnimateMaker&) {
     SkASSERT(width != -1);
     SkASSERT(height != -1);
     SkASSERT(rowBytes >= 0);
-    SkColorType colorType = SkBitmapConfigToColorType((SkBitmap::Config)format);
-    fBitmap.setInfo(SkImageInfo::Make(width, height, colorType, kPremul_SkAlphaType), rowBytes);
-    fBitmap.allocPixels();
+    SkColorType colorType = SkColorType(format);
+    fBitmap.allocPixels(SkImageInfo::Make(width, height, colorType, kPremul_SkAlphaType),
+                        rowBytes);
     if (fColorSet)
         fBitmap.eraseColor(fColor);
 }
@@ -130,8 +131,8 @@ const SkMemberInfo SkImageBaseBitmap::fInfo[] = {
 
 DEFINE_GET_MEMBER(SkImageBaseBitmap);
 
-SkImageBaseBitmap::SkImageBaseBitmap() : fDirty(true), fUriBase(NULL) {
-    base64.fData = NULL;
+SkImageBaseBitmap::SkImageBaseBitmap() : fDirty(true), fUriBase(nullptr) {
+    base64.fData = nullptr;
     base64.fLength = 0;
 }
 
@@ -181,7 +182,9 @@ void SkImageBaseBitmap::resolve() {
     fDirty = false;
     if (base64.fData) {
         fBitmap.reset();
-        SkImageDecoder::DecodeMemory(base64.fData, base64.fLength, &fBitmap);
+        sk_sp<SkData> data = SkData::MakeWithoutCopy(base64.fData, base64.fLength);
+        sk_sp<SkImage> image = SkImage::MakeFromEncoded(data);
+        image->asLegacyBitmap(&fBitmap, SkImage::kRO_LegacyBitmapMode);
     } else if (src.size()) {
         if (fLast.equals(src))
             return;
@@ -189,9 +192,10 @@ void SkImageBaseBitmap::resolve() {
         fBitmap.reset();
 
         //SkStream* stream = SkStream::GetURIStream(fUriBase, src.c_str());
-        SkAutoTUnref<SkStreamAsset> stream(SkStream::NewFromFile(src.c_str()));
-        if (stream.get()) {
-            SkImageDecoder::DecodeStream(stream, &fBitmap);
+        sk_sp<SkData> data = SkData::MakeFromFileName(src.c_str());
+        if (data) {
+            sk_sp<SkImage> image = SkImage::MakeFromEncoded(data);
+            image->asLegacyBitmap(&fBitmap, SkImage::kRO_LegacyBitmapMode);
         }
     }
 }

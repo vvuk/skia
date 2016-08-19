@@ -9,6 +9,9 @@
 #define SkTypeface_win_DEFINED
 
 #include "SkTypeface.h"
+#include <dwrite.h>
+
+#ifdef SK_BUILD_FOR_WIN
 
 /**
  *  Like the other Typeface create methods, this returns a new reference to the
@@ -38,9 +41,21 @@ SK_API void SkTypeface_SetEnsureLOGFONTAccessibleProc(void (*)(const LOGFONT&));
 class SkFontMgr;
 class SkRemotableFontMgr;
 struct IDWriteFactory;
+struct IDWriteFontCollection;
+
+/**
+ *  Like the other Typeface create methods, this returns a new reference to the
+ *  corresponding typeface for the specified dwrite font. The caller is responsible
+ *  for calling unref() when it is finished.
+ */
+SK_API SkTypeface* SkCreateTypefaceFromDWriteFont(IDWriteFactory* aFactory,
+                                                  IDWriteFontFace* aFontFace,
+                                                  IDWriteFont* aFont,
+                                                  IDWriteFontFamily* aFontFamily);
 
 SK_API SkFontMgr* SkFontMgr_New_GDI();
-SK_API SkFontMgr* SkFontMgr_New_DirectWrite(IDWriteFactory* factory = NULL);
+SK_API SkFontMgr* SkFontMgr_New_DirectWrite(IDWriteFactory* factory = NULL,
+                                            IDWriteFontCollection* collection = NULL);
 
 /**
  *  Creates an SkFontMgr which renders using DirectWrite and obtains its data
@@ -58,4 +73,5 @@ SK_API SkFontMgr* SkFontMgr_New_DirectWriteRenderer(SkRemotableFontMgr*);
  */
 SK_API SkRemotableFontMgr* SkRemotableFontMgr_New_DirectWrite();
 
-#endif
+#endif  // SK_BUILD_FOR_WIN
+#endif  // SkTypeface_win_DEFINED

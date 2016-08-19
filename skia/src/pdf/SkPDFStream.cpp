@@ -1,4 +1,3 @@
-
 /*
  * Copyright 2010 Google Inc.
  *
@@ -8,118 +7,63 @@
 
 
 #include "SkData.h"
-#include "SkFlate.h"
-#include "SkPDFCatalog.h"
+#include "SkDeflate.h"
 #include "SkPDFStream.h"
 #include "SkStream.h"
-
-static bool skip_compression(SkPDFCatalog* catalog) {
-    return SkToBool(catalog->getDocumentFlags() &
-                    SkPDFDocument::kFavorSpeedOverSize_Flags);
-}
-
-SkPDFStream::SkPDFStream(SkStream* stream) : fState(kUnused_State) {
-    setData(stream);
-}
-
-SkPDFStream::SkPDFStream(SkData* data) : fState(kUnused_State) {
-    setData(data);
-}
-
-SkPDFStream::SkPDFStream(const SkPDFStream& pdfStream)
-        : SkPDFDict(),
-          fState(kUnused_State) {
-    setData(pdfStream.fData.get());
-    bool removeLength = true;
-    // Don't uncompress an already compressed stream, but we could.
-    if (pdfStream.fState == kCompressed_State) {
-        fState = kCompressed_State;
-        removeLength = false;
-    }
-    SkPDFDict::Iter dict(pdfStream);
-    SkPDFName* key;
-    SkPDFObject* value;
-    SkPDFName lengthName("Length");
-    for (key = dict.next(&value); key != NULL; key = dict.next(&value)) {
-        if (removeLength && *key == lengthName) {
-            continue;
-        }
-        this->insert(key, value);
-    }
-}
+#include "SkStreamPriv.h"
 
 SkPDFStream::~SkPDFStream() {}
 
-void SkPDFStream::emitObject(SkWStream* stream, SkPDFCatalog* catalog,
-                             bool indirect) {
-    if (indirect) {
-        return emitIndirectObject(stream, catalog);
-    }
-    if (!this->populate(catalog)) {
-        return fSubstitute->emitObject(stream, catalog, indirect);
-    }
+void SkPDFStream::drop() {
+    fCompressedData.reset(nullptr);
+    this->SkPDFDict::drop();
+}
 
-    this->INHERITED::emitObject(stream, catalog, false);
+void SkPDFStream::emitObject(SkWStream* stream,
+                             const SkPDFObjNumMap& objNumMap,
+                             const SkPDFSubstituteMap& substitutes) const {
+    SkASSERT(fCompressedData);
+    this->INHERITED::emitObject(stream, objNumMap, substitutes);
+    // duplicate (a cheap operation) preserves const on fCompressedData.
+    std::unique_ptr<SkStreamRewindable> dup(fCompressedData->duplicate());
+    SkASSERT(dup);
+    SkASSERT(dup->hasLength());
     stream->writeText(" stream\n");
-    stream->writeStream(fData.get(), fData->getLength());
-    fData->rewind();
+    stream->writeStream(dup.get(), dup->getLength());
     stream->writeText("\nendstream");
 }
 
-size_t SkPDFStream::getOutputSize(SkPDFCatalog* catalog, bool indirect) {
-    if (indirect) {
-        return getIndirectOutputSize(catalog);
-    }
-    if (!this->populate(catalog)) {
-        return fSubstitute->getOutputSize(catalog, indirect);
-    }
-
-    return this->INHERITED::getOutputSize(catalog, false) +
-        strlen(" stream\n\nendstream") + fData->getLength();
-}
-
-SkPDFStream::SkPDFStream() : fState(kUnused_State) {}
-
-void SkPDFStream::setData(SkData* data) {
-    SkMemoryStream* stream = new SkMemoryStream;
-    stream->setData(data);
-    fData.reset(stream);  // Transfer ownership.
-}
 
 void SkPDFStream::setData(SkStream* stream) {
-    // Code assumes that the stream starts at the beginning and is rewindable.
-    if (stream) {
-        SkASSERT(stream->getPosition() == 0);
-        SkASSERT(stream->rewind());
-    }
-    fData.reset(stream);
-    SkSafeRef(stream);
-}
+    SkASSERT(!fCompressedData);  // Only call this function once.
+    SkASSERT(stream);
+    // Code assumes that the stream starts at the beginning.
 
-bool SkPDFStream::populate(SkPDFCatalog* catalog) {
-    if (fState == kUnused_State) {
-        if (!skip_compression(catalog) && SkFlate::HaveFlate()) {
-            SkDynamicMemoryWStream compressedData;
-
-            SkAssertResult(SkFlate::Deflate(fData.get(), &compressedData));
-            if (compressedData.getOffset() < fData->getLength()) {
-                SkMemoryStream* stream = new SkMemoryStream;
-                stream->setData(compressedData.copyToData())->unref();
-                fData.reset(stream);  // Transfer ownership.
-                insertName("Filter", "FlateDecode");
-            }
-            fState = kCompressed_State;
-        } else {
-            fState = kNoCompression_State;
-        }
-        insertInt("Length", fData->getLength());
-    } else if (fState == kNoCompression_State && !skip_compression(catalog) &&
-               SkFlate::HaveFlate()) {
-        if (!fSubstitute.get()) {
-            fSubstitute.reset(new SkPDFStream(*this));
-            catalog->setSubstitute(this, fSubstitute.get());
-        }
-        return false;
+    #ifdef SK_PDF_LESS_COMPRESSION
+    std::unique_ptr<SkStreamRewindable> duplicate(stream->duplicate());
+    if (duplicate && duplicate->hasLength()) {
+        this->insertInt("Length", duplicate->getLength());
+        fCompressedData.reset(duplicate.release());
+        return;
     }
-    return true;
+    #endif
+
+    SkDynamicMemoryWStream compressedData;
+    SkDeflateWStream deflateWStream(&compressedData);
+    SkStreamCopy(&deflateWStream, stream);
+    deflateWStream.finalize();
+    size_t length = compressedData.bytesWritten();
+
+    if (stream->hasLength()) {
+        std::unique_ptr<SkStreamRewindable> dup(stream->duplicate());
+        if (dup && dup->hasLength() &&
+            dup->getLength() <= length + strlen("/Filter_/FlateDecode_")) {
+            this->insertInt("Length", dup->getLength());
+            fCompressedData.reset(dup.release());
+            return;
+        }
+    }
+    fCompressedData.reset(compressedData.detachAsStream());
+    this->insertName("Filter", "FlateDecode");
+    this->insertInt("Length", length);
 }

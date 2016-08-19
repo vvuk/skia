@@ -80,10 +80,10 @@ static void copyFT2LCD16(const FT_Bitmap& bitmap, const SkMask& mask, int lcdIsB
 {
     SkASSERT(SkMask::kLCD16_Format == mask.fFormat);
     if (FT_PIXEL_MODE_LCD != bitmap.pixel_mode) {
-        SkASSERT(mask.fBounds.width() == bitmap.width);
+        SkASSERT(mask.fBounds.width() == static_cast<int>(bitmap.width));
     }
     if (FT_PIXEL_MODE_LCD_V != bitmap.pixel_mode) {
-        SkASSERT(mask.fBounds.height() == bitmap.rows);
+        SkASSERT(mask.fBounds.height() == static_cast<int>(bitmap.rows));
     }
 
     const uint8_t* src = bitmap.buffer;
@@ -113,7 +113,7 @@ static void copyFT2LCD16(const FT_Bitmap& bitmap, const SkMask& mask, int lcdIsB
             }
             break;
         case FT_PIXEL_MODE_LCD:
-            SkASSERT(3 * mask.fBounds.width() == bitmap.width);
+            SkASSERT(3 * mask.fBounds.width() == static_cast<int>(bitmap.width));
             for (int y = height; y --> 0;) {
                 const uint8_t* triple = src;
                 if (lcdIsBGR) {
@@ -136,7 +136,7 @@ static void copyFT2LCD16(const FT_Bitmap& bitmap, const SkMask& mask, int lcdIsB
             }
             break;
         case FT_PIXEL_MODE_LCD_V:
-            SkASSERT(3 * mask.fBounds.height() == bitmap.rows);
+            SkASSERT(3 * mask.fBounds.height() == static_cast<int>(bitmap.rows));
             for (int y = height; y --> 0;) {
                 const uint8_t* srcR = src;
                 const uint8_t* srcG = srcR + bitmap.pitch;
@@ -165,20 +165,20 @@ static void copyFT2LCD16(const FT_Bitmap& bitmap, const SkMask& mask, int lcdIsB
  *
  *  Yes, No, Never Requested, Never Produced
  *
- *                        kBW kA8 k3D kARGB32 kLCD16 kLCD32
- *  FT_PIXEL_MODE_MONO     Y   Y  NR     N       Y     NR
- *  FT_PIXEL_MODE_GRAY     N   Y  NR     N       Y     NR
- *  FT_PIXEL_MODE_GRAY2   NP  NP  NR    NP      NP     NR
- *  FT_PIXEL_MODE_GRAY4   NP  NP  NR    NP      NP     NR
- *  FT_PIXEL_MODE_LCD     NP  NP  NR    NP      NP     NR
- *  FT_PIXEL_MODE_LCD_V   NP  NP  NR    NP      NP     NR
- *  FT_PIXEL_MODE_BGRA     N   N  NR     Y       N     NR
+ *                        kBW kA8 k3D kARGB32 kLCD16
+ *  FT_PIXEL_MODE_MONO     Y   Y  NR     N       Y
+ *  FT_PIXEL_MODE_GRAY     N   Y  NR     N       Y
+ *  FT_PIXEL_MODE_GRAY2   NP  NP  NR    NP      NP
+ *  FT_PIXEL_MODE_GRAY4   NP  NP  NR    NP      NP
+ *  FT_PIXEL_MODE_LCD     NP  NP  NR    NP      NP
+ *  FT_PIXEL_MODE_LCD_V   NP  NP  NR    NP      NP
+ *  FT_PIXEL_MODE_BGRA     N   N  NR     Y       N
  *
  *  TODO: All of these N need to be Y or otherwise ruled out.
  */
 static void copyFTBitmap(const FT_Bitmap& srcFTBitmap, SkMask& dstMask) {
-    SkASSERT(dstMask.fBounds.width() == srcFTBitmap.width);
-    SkASSERT(dstMask.fBounds.height() == srcFTBitmap.rows);
+    SkASSERT(dstMask.fBounds.width() == static_cast<int>(srcFTBitmap.width));
+    SkASSERT(dstMask.fBounds.height() == static_cast<int>(srcFTBitmap.rows));
 
     const uint8_t* src = reinterpret_cast<const uint8_t*>(srcFTBitmap.buffer);
     const FT_Pixel_Mode srcFormat = static_cast<FT_Pixel_Mode>(srcFTBitmap.pixel_mode);
@@ -194,7 +194,7 @@ static void copyFTBitmap(const FT_Bitmap& srcFTBitmap, SkMask& dstMask) {
     const size_t height = srcFTBitmap.rows;
 
     if (SkMask::kLCD16_Format == dstFormat) {
-        copyFT2LCD16<false>(srcFTBitmap, dstMask, false, NULL, NULL, NULL);
+        copyFT2LCD16<false>(srcFTBitmap, dstMask, false, nullptr, nullptr, nullptr);
         return;
     }
 
@@ -402,16 +402,12 @@ void SkScalerContext_FreeType_Base::generateGlyphImage(FT_Face face, const SkGly
                      SkMask::kARGB32_Format == maskFormat ||
                      SkMask::kLCD16_Format == maskFormat);
 
-            if (fRec.fFlags & SkScalerContext::kEmbolden_Flag &&
-                !(face->style_flags & FT_STYLE_FLAG_BOLD))
-            {
-                FT_GlyphSlot_Own_Bitmap(face->glyph);
-                FT_Bitmap_Embolden(face->glyph->library, &face->glyph->bitmap,
-                                   kBitmapEmboldenStrength, 0);
-            }
-
-            // If no scaling needed, directly copy glyph bitmap.
-            if (glyph.fWidth == face->glyph->bitmap.width &&
+            // If no skew or scaling needed, directly copy glyph bitmap.
+            bool skewed = fRec.fPreSkewX != 0 ||
+                          fRec.fPost2x2[0][1] != 0 ||
+                          fRec.fPost2x2[1][0] != 0;
+            if (!skewed &&
+                glyph.fWidth == face->glyph->bitmap.width &&
                 glyph.fHeight == face->glyph->bitmap.rows &&
                 glyph.fTop == -face->glyph->bitmap_top &&
                 glyph.fLeft == face->glyph->bitmap_left)
@@ -460,10 +456,24 @@ void SkScalerContext_FreeType_Base::generateGlyphImage(FT_Face face, const SkGly
             // Scale unscaledBitmap into dstBitmap.
             SkCanvas canvas(dstBitmap);
             canvas.clear(SK_ColorTRANSPARENT);
-            canvas.scale(SkIntToScalar(glyph.fWidth) / SkIntToScalar(face->glyph->bitmap.width),
-                         SkIntToScalar(glyph.fHeight) / SkIntToScalar(face->glyph->bitmap.rows));
+            if (skewed) {
+                // Apply any transforms with the bitmap placed at (0, 0).
+                SkMatrix matrix;
+                fRec.getSingleMatrix(&matrix);
+                SkRect srcRect = SkRect::MakeIWH(face->glyph->bitmap.width, face->glyph->bitmap.rows);
+                SkRect destRect;
+                matrix.mapRect(&destRect, srcRect);
+                matrix.postTranslate(-destRect.fLeft, -destRect.fTop);
+                // Rescale to the glyph's actual size.
+                matrix.postScale(SkIntToScalar(glyph.fWidth) / destRect.width(),
+                                 SkIntToScalar(glyph.fHeight) / destRect.height());
+                canvas.setMatrix(matrix);
+            } else {
+                canvas.scale(SkIntToScalar(glyph.fWidth) / SkIntToScalar(face->glyph->bitmap.width),
+                             SkIntToScalar(glyph.fHeight) / SkIntToScalar(face->glyph->bitmap.rows));
+            }
             SkPaint paint;
-            paint.setFilterLevel(SkPaint::kLow_FilterLevel);
+            paint.setFilterQuality(kMedium_SkFilterQuality);
             canvas.drawBitmap(unscaledBitmap, 0, 0, &paint);
 
             // If the destination is BW or LCD, convert from A8.

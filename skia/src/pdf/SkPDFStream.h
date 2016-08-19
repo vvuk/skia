@@ -1,4 +1,3 @@
-
 /*
  * Copyright 2010 Google Inc.
  *
@@ -15,84 +14,51 @@
 #include "SkStream.h"
 #include "SkTemplates.h"
 
-class SkPDFCatalog;
+class SkPDFObjNumMap;
 
 /** \class SkPDFStream
 
     A stream object in a PDF.  Note, all streams must be indirect objects (via
     SkObjRef).
-    TODO(vandebo): SkStream should be replaced by SkStreamRewindable when that
-    is feasible.
 */
 class SkPDFStream : public SkPDFDict {
-    SK_DECLARE_INST_COUNT(SkPDFStream)
+
 public:
     /** Create a PDF stream. A Length entry is automatically added to the
-     *  stream dictionary. The stream may be retained (stream->ref() may be
-     *  called) so its contents must not be changed after calling this.
-     *  @param data  The data part of the stream.
+     *  stream dictionary.
+     *  @param data   The data part of the stream.  Will not take ownership.
      */
-    explicit SkPDFStream(SkData* data);
-    /** Deprecated constructor. */
-    explicit SkPDFStream(SkStream* stream);
-    /** Create a PDF stream with the same content and dictionary entries
-     *  as the passed one.
+    explicit SkPDFStream(SkData* data) { this->setData(data); }
+
+    /** Create a PDF stream. A Length entry is automatically added to the
+     *  stream dictionary.
+     *  @param stream The data part of the stream.  Will not take ownership.
      */
-    explicit SkPDFStream(const SkPDFStream& pdfStream);
+    explicit SkPDFStream(SkStream* stream) { this->setData(stream); }
+
     virtual ~SkPDFStream();
 
     // The SkPDFObject interface.
-    virtual void emitObject(SkWStream* stream, SkPDFCatalog* catalog,
-                            bool indirect);
-    virtual size_t getOutputSize(SkPDFCatalog* catalog, bool indirect);
+    void emitObject(SkWStream* stream,
+                    const SkPDFObjNumMap& objNumMap,
+                    const SkPDFSubstituteMap& substitutes) const override;
+    void drop() override;
 
 protected:
-    enum State {
-        kUnused_State,         //!< The stream hasn't been requested yet.
-        kNoCompression_State,  //!< The stream's been requested in an
-                               //   uncompressed form.
-        kCompressed_State,     //!< The stream's already been compressed.
-    };
-
     /* Create a PDF stream with no data.  The setData method must be called to
      * set the data.
      */
-    SkPDFStream();
+    SkPDFStream() {}
 
-    // Populate the stream dictionary.  This method returns false if
-    // fSubstitute should be used.
-    virtual bool populate(SkPDFCatalog* catalog);
-
-    void setSubstitute(SkPDFStream* stream) {
-        fSubstitute.reset(stream);
-    }
-
-    SkPDFStream* getSubstitute() {
-        return fSubstitute.get();
-    }
-
-    void setData(SkData* data);
+    /** Only call this function once. */
     void setData(SkStream* stream);
-
-    SkStream* getData() {
-        return fData.get();
-    }
-
-    void setState(State state) {
-        fState = state;
-    }
-
-    State getState() {
-        return fState;
+    void setData(SkData* data) {
+        SkMemoryStream memoryStream(data);
+        this->setData(&memoryStream);
     }
 
 private:
-    // Indicates what form (or if) the stream has been requested.
-    State fState;
-
-    // TODO(vandebo): Use SkData (after removing deprecated constructor).
-    SkAutoTUnref<SkStream> fData;
-    SkAutoTUnref<SkPDFStream> fSubstitute;
+    std::unique_ptr<SkStreamRewindable> fCompressedData;
 
     typedef SkPDFDict INHERITED;
 };
