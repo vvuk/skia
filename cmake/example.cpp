@@ -12,7 +12,7 @@
 #include "../include/effects/SkGradientShader.h"
 #include "../include/gpu/GrContext.h"
 #include "../include/core/SkPictureRecorder.h"
-
+#include "../tools/Resources.h"
 
 // These headers are just handy for writing this example file.  Nothing Skia specific.
 #include <cstdlib>
@@ -60,6 +60,13 @@ static std::shared_ptr<SkSurface> create_opengl_surface(int w, int h) {
                                             SkBudgeted::kNo,
                                             SkImageInfo::MakeN32Premul(w,h)).release());
 }
+
+
+sk_sp<SkImage> GetResourceAsImage(const char* path) {
+    sk_sp<SkData> resourceData(SkData::MakeFromFileName(path));
+    return SkImage::MakeFromEncoded(resourceData);
+}
+
 
 extern SkImageEncoder_EncodeReg gEReg;
 SkImageEncoder_EncodeReg *k = &gEReg;
@@ -208,20 +215,27 @@ void drawGlyphs(SkCanvas *c, YAML::Node &item) {
 
 }
 
-void drawImage(SkCanvas *c, YAML::Node &node) {}
+void drawImage(SkCanvas *c, YAML::Node &node) {
+    auto path = node["image"].as<string>();
+    auto bounds = node["bounds"].as<vector<double>>();
+    sk_sp<SkImage> img = GetResourceAsImage(path.c_str());
+    c->drawImage(img, bounds[0], bounds[1]);
+
+
+}
 
 void drawItem(SkCanvas *c, YAML::Node &node) {
-        std::cout << "item\n";
-        if (node["text"]) {
-                drawText(c, node);
-        } else if (node["rect"]) {
-                drawRect(c, node);
-        } else if (node["image"]) {
-                drawImage(c, node);
-        } else if (node["glyphs"]) {
-                drawGlyphs(c, node);
-        } else if (node["stacking_context"]) {
-        }
+    std::cout << "item\n";
+    if (node["text"]) {
+        drawText(c, node);
+    } else if (node["rect"]) {
+        drawRect(c, node);
+    } else if (node["image"]) {
+        drawImage(c, node);
+    } else if (node["glyphs"]) {
+        drawGlyphs(c, node);
+    } else if (node["stacking_context"]) {
+    }
 }
 
 
@@ -251,7 +265,7 @@ int main(int, char**) {
     canvas->clear(SK_ColorWHITE);
     canvas->drawText(msg, strlen(msg), 90,120, paint);
 
-    std::ifstream fin("glyphs.yaml");
+    std::ifstream fin("image-test.yaml");
 
     YAML::Node doc = YAML::Load(fin);
     for (auto i : doc["root"]["items"]) {
