@@ -35,6 +35,8 @@ list (APPEND public_includes ${userconfig_directory})
 list (APPEND srcs             ../third_party/etc1/etc1.cpp ../third_party/ktx/ktx.cpp)
 list (APPEND private_includes ../third_party/etc1          ../third_party/ktx)
 
+list (APPEND private_includes ../third_party/gif)
+list (APPEND srcs             ../third_party/gif/SkGifImageReader.cpp)
 list (APPEND private_includes ../third_party/libpng)
 file (GLOB libpng_srcs ../third_party/libpng/*.c)
 foreach (src ${libpng_srcs})
@@ -141,7 +143,7 @@ if (NOT WIN32)
     set_source_files_properties(${sse42_srcs} PROPERTIES COMPILE_FLAGS -msse4.2)
     set_source_files_properties(${avx_srcs}   PROPERTIES COMPILE_FLAGS -mavx)
     set_source_files_properties(${hsw_srcs}   PROPERTIES COMPILE_FLAGS
-        -mavx2 -mbmi -mbmi2 -mf16c -mfma)
+        -mfma -madvx2 -mbmi -mbmi2 -mf16c)
 endif()
 
 # Detect our optional dependencies.
@@ -181,12 +183,6 @@ else()
     remove_srcs (../src/ports/SkFontMgr_android_parser.cpp)
 endif()
 
-if (GIF_FOUND)
-    list (APPEND private_includes ${GIF_INCLUDE_DIRS})
-    list (APPEND libs             ${GIF_LIBRARIES})
-else()
-    remove_srcs(../src/images/*GIF*)
-endif()
 
 if (JPEG_TURBO_FOUND)
     list (APPEND private_includes ${JPEG_TURBO_INCLUDE_DIRS})
@@ -197,12 +193,12 @@ else()
     remove_srcs(../src/codec/*Jpeg*)
 endif()
 
-if (LUA_FOUND)
-    list (APPEND private_includes ${LUA_INCLUDE_DIR})
-    list (APPEND libs             ${LUA_LIBRARIES})
-else()
-    remove_srcs(../src/utils/*Lua*)
-endif()
+remove_srcs(../src/utils/*Lua*)
+#if (LUA_FOUND)
+#    list (APPEND private_includes ${LUA_INCLUDE_DIR})
+#    list (APPEND libs             ${LUA_LIBRARIES})
+#else()
+#endif()
 
 # PNG
 add_definitions(-DSK_HAS_PNG_LIBRARY)
@@ -360,6 +356,9 @@ foreach (include ${public_includes})
 endforeach()
 file(APPEND ${skia_h_path} "\n#endif  // skia_DEFINED\n")
 
+add_subdirectory(yaml-cpp)
+include_directories(yaml-cpp/include)
+
 # Now build a simple example app that uses Skia via libskia.so.
 add_executable(example example.cpp)
-target_link_libraries(example skia ${OPENGL_LIBRARIES})
+target_link_libraries(example skia yaml-cpp ${OPENGL_LIBRARIES})

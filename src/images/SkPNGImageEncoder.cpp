@@ -359,4 +359,4 @@ SkImageEncoder* sk_libpng_efactory(SkImageEncoder::Type t) {
     return (SkImageEncoder::kPNG_Type == t) ? new SkPNGImageEncoder : nullptr;
 }
 
-static SkImageEncoder_EncodeReg gEReg(sk_libpng_efactory);
+SkImageEncoder_EncodeReg gEReg(sk_libpng_efactory);
