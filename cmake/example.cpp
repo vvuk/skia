@@ -6,10 +6,13 @@
  */
 
 #include "../include/core/SkCanvas.h"
+#include "../include/core/SkStream.h"
 #include "../include/core/SkData.h"
 #include "../include/core/SkSurface.h"
 #include "../include/effects/SkGradientShader.h"
 #include "../include/gpu/GrContext.h"
+#include "../include/core/SkPictureRecorder.h"
+
 
 // These headers are just handy for writing this example file.  Nothing Skia specific.
 #include <cstdlib>
@@ -230,6 +233,8 @@ int main(int, char**) {
 
 
 
+    int width = 320;
+    int height = 240;
     // Create a left-to-right green-to-purple gradient shader.
     SkPoint pts[] = { {0,0}, {320,240} };
     SkColor colors[] = { 0xFF00FF00, 0xFFFF00FF };
@@ -239,8 +244,9 @@ int main(int, char**) {
     paint.setAntiAlias(true);
     paint.setShader(SkGradientShader::MakeLinear(pts, colors, nullptr, 2, SkShader::kRepeat_TileMode));
 
-    // Draw to the surface via its SkCanvas.
-    SkCanvas* canvas = surface->getCanvas();   // We don't manage this pointer's lifetime.
+    SkPictureRecorder recorder;
+    SkCanvas* canvas = recorder.beginRecording(width, height, nullptr, 0);
+
     static const char* msg = "Hello world!";
     canvas->clear(SK_ColorWHITE);
     canvas->drawText(msg, strlen(msg), 90,120, paint);
@@ -251,7 +257,16 @@ int main(int, char**) {
     for (auto i : doc["root"]["items"]) {
         drawItem(canvas, i);
     }
+    sk_sp<SkPicture> pic = recorder.finishRecordingAsPicture();
 
+
+    // Draw to the surface via its SkCanvas.
+    SkCanvas* ic = surface->getCanvas();   // We don't manage this pointer's lifetime.
+
+    pic->playback(ic);
+
+    SkFILEWStream stream("out.skp");
+    pic->serialize(&stream);
 
     // Grab a snapshot of the surface as an immutable SkImage.
     sk_sp<SkImage> image = surface->makeImageSnapshot();
