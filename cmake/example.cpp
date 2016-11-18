@@ -181,6 +181,30 @@ void drawRect(SkCanvas *c, YAML::Node &item) {
     c->drawRect(bounds, paint);
 
 }
+
+void drawGlyphs(SkCanvas *c, YAML::Node &item) {
+    // XXX: handle bounds
+    vector<uint16_t> indices;
+    vector<SkPoint> offsets;
+    for (auto i : item["glyphs"]) {
+            indices.push_back(i.as<uint16_t>());
+    }
+    for (auto i : item["positions"]) {
+            SkPoint p;
+            p.fY = 0;
+            p.fX = i.as<double>();
+            offsets.push_back(p);
+    }
+
+    SkPaint paint;
+    if (item["color"]) {
+        auto color = item["color"].as<SkColorW>().color;
+        paint.setColor(color);
+    }
+    c->drawPosText(indices.data(), indices.size()*2, offsets.data(), paint);
+
+}
+
 void drawImage(SkCanvas *c, YAML::Node &node) {}
 
 void drawItem(SkCanvas *c, YAML::Node &node) {
@@ -191,6 +215,8 @@ void drawItem(SkCanvas *c, YAML::Node &node) {
                 drawRect(c, node);
         } else if (node["image"]) {
                 drawImage(c, node);
+        } else if (node["glyphs"]) {
+                drawGlyphs(c, node);
         } else if (node["stacking_context"]) {
         }
 }
