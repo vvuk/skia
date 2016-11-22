@@ -6,6 +6,7 @@
  */
 
 #include "../include/core/SkCanvas.h"
+#include "../include/core/SkTypeface.h"
 #include "../include/core/SkStream.h"
 #include "../include/core/SkData.h"
 #include "../include/core/SkSurface.h"
@@ -20,6 +21,7 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <assert.h>
 
 // These setup_gl_context() are not meant to represent good form.
 // They are just quick hacks to get us going.
@@ -106,17 +108,17 @@ struct convert<SkColorW> {
             auto vec = node.as<vector<double>>();
             if (vec.size() == 4) {
                 SkColor4f color;
-                color.fR = node[0].as<double>() / 255.;
-                color.fG = node[1].as<double>() / 255.;
-                color.fB = node[2].as<double>() / 255.;
-                color.fA = node[3].as<double>() / 255.;
+                color.fR = vec[0] / 255.;
+                color.fG = vec[1] / 255.;
+                color.fB = vec[2] / 255.;
+                color.fA = vec[3];
                 rhs.color = color.toSkColor();
                 return true;
             } else if (vec.size() == 4) {
                 SkColor4f color;
-                color.fR = node[0].as<double>() / 255.;
-                color.fG = node[1].as<double>() / 255.;
-                color.fB = node[2].as<double>() / 255.;
+                color.fR = vec[0] / 255.;
+                color.fG = vec[1] / 255.;
+                color.fB = vec[2] / 255.;
                 color.fA = 1.;
                 rhs.color = color.toSkColor();
                 return true;
@@ -169,11 +171,12 @@ void drawText(SkCanvas *c, YAML::Node &item) {
         paint.setColor(color);
     }
     if (item["size"]) {
-        paint.setTextSize(item["size"].as<int>());
-        cout << item["size"].as<int>();
+        paint.setTextSize(item["size"].as<double>());
+        cout << item["size"].as<double>();
     }
 
     auto text = item["text"].as<string>();
+    paint.setAntiAlias(true);
     c->drawText(text.c_str(), strlen(text.c_str()),
                 origin[0],
                 origin[1],
@@ -182,7 +185,11 @@ void drawText(SkCanvas *c, YAML::Node &item) {
 }
 void drawRect(SkCanvas *c, YAML::Node &item) {
     // XXX: handle bounds
-    auto bounds = item["rect"].as<SkRect>();
+    SkRect bounds;
+    if (item["rect"])
+            bounds = item["rect"].as<SkRect>();
+    else
+            bounds = item["bounds"].as<SkRect>();
     SkPaint paint;
     if (item["color"]) {
         auto color = item["color"].as<SkColorW>().color;
@@ -199,18 +206,44 @@ void drawGlyphs(SkCanvas *c, YAML::Node &item) {
     for (auto i : item["glyphs"]) {
             indices.push_back(i.as<uint16_t>());
     }
-    for (auto i : item["positions"]) {
+    for (int i = 0; i < item["offsets"].size(); i+= 2) {
             SkPoint p;
-            p.fY = 0;
-            p.fX = i.as<double>();
+            p.fX = item["offsets"][i].as<double>();
+            p.fY = item["offsets"][i+1].as<double>();
             offsets.push_back(p);
     }
 
     SkPaint paint;
+    if (item["size"]) {
+        paint.setTextSize(item["size"].as<double>());
+        cout << item["size"].as<double>();
+    }
+
+    SkFontStyle::Weight weight = SkFontStyle::kNormal_Weight;
+    if (item["weight"]) {
+            weight = (SkFontStyle::Weight)item["weight"].as<int>();
+    }
+
+    if (item["family"]) {
+        sk_sp<SkTypeface> typeface = SkTypeface::MakeFromName(item["family"].as<string>().c_str(), SkFontStyle(weight,
+                                                                                                               SkFontStyle::kNormal_Width,
+                                                                                                               SkFontStyle::kUpright_Slant));
+        paint.setTypeface(typeface);
+    }
+
     if (item["color"]) {
         auto color = item["color"].as<SkColorW>().color;
         paint.setColor(color);
     }
+    
+    if (item["color"]) {
+        auto color = item["color"].as<SkColorW>().color;
+        paint.setColor(color);
+    }
+
+    assert(indices.size() == offsets.size());
+    paint.setTextEncoding(SkPaint::kGlyphID_TextEncoding);
+    paint.setAntiAlias(true);
     c->drawPosText(indices.data(), indices.size()*2, offsets.data(), paint);
 
 }
@@ -220,9 +253,18 @@ void drawImage(SkCanvas *c, YAML::Node &node) {
     auto bounds = node["bounds"].as<vector<double>>();
     sk_sp<SkImage> img = GetResourceAsImage(path.c_str());
     c->drawImage(img, bounds[0], bounds[1]);
-
-
 }
+void drawItem(SkCanvas *c, YAML::Node &node);
+void drawStackingContext(SkCanvas *c, YAML::Node &node) {
+    auto bounds = node["bounds"].as<vector<double>>();
+    c->save();
+    c->translate(bounds[0], bounds[1]);
+    for (auto i : node["items"]) {
+        drawItem(c, i);
+    }
+    c->restore();
+}
+
 
 void drawItem(SkCanvas *c, YAML::Node &node) {
     std::cout << "item\n";
@@ -235,20 +277,28 @@ void drawItem(SkCanvas *c, YAML::Node &node) {
     } else if (node["glyphs"]) {
         drawGlyphs(c, node);
     } else if (node["stacking_context"]) {
+    } else if (node["type"]) {
+            auto type = node["type"].as<string>();
+            if (type == "stacking_context") {
+                    drawStackingContext(c, node);
+            } else if (type == "rect") {
+                    drawRect(c, node);
+            }
     }
+
 }
 
 
 int main(int, char**) {
     bool gl_ok = setup_gl_context();
     srand((unsigned)time(nullptr));
-    std::shared_ptr<SkSurface> surface = (gl_ok && rand() % 2) ? create_opengl_surface(320, 240)
-                                                               : create_raster_surface(320, 240);
+    int width = 1024;
+    int height = 2048;
+    std::shared_ptr<SkSurface> surface = (gl_ok && rand() % 2) ? create_opengl_surface(width, height)
+                                                               : create_raster_surface(width, height);
 
 
 
-    int width = 320;
-    int height = 240;
     // Create a left-to-right green-to-purple gradient shader.
     SkPoint pts[] = { {0,0}, {320,240} };
     SkColor colors[] = { 0xFF00FF00, 0xFFFF00FF };
@@ -259,21 +309,26 @@ int main(int, char**) {
     paint.setShader(SkGradientShader::MakeLinear(pts, colors, nullptr, 2, SkShader::kRepeat_TileMode));
 
     SkPictureRecorder recorder;
+#define INDIRECT
+#ifdef INDIRECT
     SkCanvas* canvas = recorder.beginRecording(width, height, nullptr, 0);
+#else
+    SkCanvas* canvas = surface->getCanvas();   // We don't manage this pointer's lifetime.
+#endif
 
     static const char* msg = "Hello world!";
-    canvas->clear(SK_ColorWHITE);
-    canvas->drawText(msg, strlen(msg), 90,120, paint);
+    canvas->clear(SK_ColorRED);
+    //canvas->drawText(msg, strlen(msg), 90,120, paint);
 
-    std::ifstream fin("image-test.yaml");
+    std::ifstream fin("frame-1155.yaml");
 
     YAML::Node doc = YAML::Load(fin);
     for (auto i : doc["root"]["items"]) {
         drawItem(canvas, i);
     }
+
+#ifdef INDIRECT
     sk_sp<SkPicture> pic = recorder.finishRecordingAsPicture();
-
-
     // Draw to the surface via its SkCanvas.
     SkCanvas* ic = surface->getCanvas();   // We don't manage this pointer's lifetime.
 
@@ -281,7 +336,7 @@ int main(int, char**) {
 
     SkFILEWStream stream("out.skp");
     pic->serialize(&stream);
-
+#endif
     // Grab a snapshot of the surface as an immutable SkImage.
     sk_sp<SkImage> image = surface->makeImageSnapshot();
     // Encode that image as a .png into a blob in memory.
