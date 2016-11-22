@@ -336,9 +336,13 @@ if (nullptr == fSurface) {
     timespec last;
     clock_gettime(CLOCK_MONOTONIC, &last);
 
+    int k;
     while (1) {
-    gPic->playback(canvas);
-    canvas->flush();
+//    gPic->playback(canvas);
+
+///    canvas->clear(0xff000000 | k++);
+    canvas->drawPicture(gPic);
+            canvas->flush();
 
 
     // Black background

@@ -361,4 +361,15 @@ include_directories(yaml-cpp/include)
 
 # Now build a simple example app that uses Skia via libskia.so.
 add_executable(example example.cpp)
+add_executable(viewer viewer.cpp)
+
+find_package(GLUT REQUIRED)
+include_directories(${GLUT_INCLUDE_DIRS})
+link_directories(${GLUT_LIBRARY_DIRS})
+add_definitions(${GLUT_DEFINITIONS})
+if(NOT GLUT_FOUND)
+   message(ERROR " GLUT not found!")
+endif(NOT GLUT_FOUND)
+
 target_link_libraries(example skia yaml-cpp ${OPENGL_LIBRARIES})
+target_link_libraries(viewer skia yaml-cpp ${OPENGL_LIBRARIES} ${GLUT_LIBRARY})
