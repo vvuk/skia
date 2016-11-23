@@ -1,4 +1,5 @@
 *.swp
+.vs
 
 *.ninja
 .ninja*
@@ -12,3 +13,6 @@ example.png
 include
 skia_compile_arguments.txt
 skia_link_arguments.txt
+
+build
+nuget-packages

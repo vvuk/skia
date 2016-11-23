@@ -27,6 +27,10 @@
 #include <memory>
 #include <assert.h>
 
+#include <chrono>
+
+extern void drawYAMLFile(SkCanvas *canvas, const char *file);
+
 // These setup_gl_context() are not meant to represent good form.
 // They are just quick hacks to get us going.
 #if defined(__APPLE__)
@@ -107,6 +111,11 @@ if (nullptr == fSurface) {
 	desc.fSampleCnt = 0;
 	desc.fStencilBits = 0;
 	GrGLint buffer;
+
+    #ifndef GL_FRAMEBUFFER_BINDING
+    #define GL_FRAMEBUFFER_BINDING            0x8CA6
+    #endif
+
 	glGetIntegerv(GL_FRAMEBUFFER_BINDING, &buffer);
 	desc.fRenderTargetHandle = buffer;
     SkSurfaceProps    fSurfaceProps(SkSurfaceProps::kLegacyFontHost_InitType);
@@ -120,8 +129,7 @@ if (nullptr == fSurface) {
     glClear(GL_COLOR_BUFFER_BIT);
     SkCanvas* canvas = fSurface->getCanvas();   // We don't manage this pointer's lifetime.
 
-    timespec last;
-    clock_gettime(CLOCK_MONOTONIC, &last);
+    auto before = std::chrono::high_resolution_clock::now();
 
     int k;
     while (1) {
@@ -135,12 +143,14 @@ if (nullptr == fSurface) {
     // Black background
     //Draw i
     glFlush();
-    timespec res;
-    clock_gettime(CLOCK_MONOTONIC, &res);
-    double before = last.tv_sec*1000*1000*1000. + last.tv_nsec;
-    double after = res.tv_sec*1000*1000*1000. + res.tv_nsec;
-    printf("%f\n", (after-before)/(1000*1000));
-    last = res;
+
+    auto after = std::chrono::high_resolution_clock::now();
+
+    using FpMilliseconds = 
+        std::chrono::duration<double, std::chrono::milliseconds::period>;
+
+    printf("%f\n", FpMilliseconds(after - before).count());
+    before = after;
     }
 
 }
