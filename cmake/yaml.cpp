@@ -202,6 +202,7 @@ void drawGlyphs(SkCanvas *c, YAML::Node &item) {
 
 void drawImage(SkCanvas *c, YAML::Node &node) {
     auto path = node["image"].as<string>();
+    std::cout << "image path: " << path << std::endl;
     auto bounds = node["bounds"].as<vector<double>>();
     sk_sp<SkImage> img = GetResourceAsImage(path.c_str());
     c->drawImage(img, bounds[0], bounds[1]);

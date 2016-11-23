@@ -29,6 +29,9 @@
 
 #include <chrono>
 
+static int gWidth = 1920;
+static int gHeight = 1080;
+
 extern void drawYAMLFile(SkCanvas *canvas, const char *file);
 
 // These setup_gl_context() are not meant to represent good form.
@@ -100,12 +103,10 @@ void draw(void) {
 if (nullptr == fSurface) {
     auto fActualColorBits =  24;
 
-    int width = 1024;
-    int height = 768;
     if (fContext) {
 	GrBackendRenderTargetDesc desc;
-	desc.fWidth = width;
-	desc.fHeight = height;
+	desc.fWidth = gWidth;
+	desc.fHeight = gHeight;
 	desc.fConfig = kRGBA_8888_GrPixelConfig;
 	desc.fOrigin = kBottomLeft_GrSurfaceOrigin;
 	desc.fSampleCnt = 0;
@@ -153,7 +154,8 @@ if (nullptr == fSurface) {
         sum_frame += dur;
 
         if (++k == 60) {
-            printf("%3.6f [%3.6f .. %3.6f]\n", (sum_frame / k).count(), min_frame.count(), max_frame.count());
+            double ms = (sum_frame / k).count();
+            printf("%3.6f [%3.6f .. %3.6f]  -- %4.7f fps\n", ms, min_frame.count(), max_frame.count(), 1000.0 / ms);
             k = 0;
             min_frame = FpMilliseconds::max();
             max_frame = FpMilliseconds::min();
@@ -167,31 +169,9 @@ if (nullptr == fSurface) {
 }
 
 int main(int argc, char** argv) {
-    bool gl_ok = setup_gl_context();
-    srand((unsigned)time(nullptr));
-    int width = 1024;
-    int height = 2048;
-    std::shared_ptr<SkSurface> surface = (gl_ok && rand() % 2) ? create_opengl_surface(width, height)
-                                                               : create_raster_surface(width, height);
-
-
-
-    // Create a left-to-right green-to-purple gradient shader.
-    SkPoint pts[] = { {0,0}, {320,240} };
-    SkColor colors[] = { 0xFF00FF00, 0xFFFF00FF };
-    // Our text will draw with this paint: size 24, antialiased, with the shader.
-    SkPaint paint;
-    paint.setTextSize(24);
-    paint.setAntiAlias(true);
-    paint.setShader(SkGradientShader::MakeLinear(pts, colors, nullptr, 2, SkShader::kRepeat_TileMode));
-
+    
     SkPictureRecorder recorder;
-#define INDIRECT
-#ifdef INDIRECT
-    SkCanvas* canvas = recorder.beginRecording(width, height, nullptr, 0);
-#else
-    SkCanvas* canvas = surface->getCanvas();   // We don't manage this pointer's lifetime.
-#endif
+    SkCanvas* canvas = recorder.beginRecording(gWidth, gHeight, nullptr, 0);
 
     static const char* msg = "Hello world!";
     canvas->clear(SK_ColorRED);
@@ -199,19 +179,20 @@ int main(int argc, char** argv) {
 
     drawYAMLFile(canvas, argv[1]);
 
-#ifdef INDIRECT
     sk_sp<SkPicture> pic = recorder.finishRecordingAsPicture();
     // Draw to the surface via its SkCanvas.
     gPic = pic;
-    SkCanvas* ic = surface->getCanvas();   // We don't manage this pointer's lifetime.
 
-    pic->playback(ic);
-
+#if 0
     SkFILEWStream stream("out.skp");
     pic->serialize(&stream);
 #endif
 
-#if 0
+#if 1
+    std::shared_ptr<SkSurface> surface = create_raster_surface(gWidth, gHeight);
+    SkCanvas* ic = surface->getCanvas();   // We don't manage this pointer's lifetime.
+    pic->playback(ic);
+
     // Grab a snapshot of the surface as an immutable SkImage.
     sk_sp<SkImage> image = surface->makeImageSnapshot();
     // Encode that image as a .png into a blob in memory.
@@ -237,11 +218,10 @@ int main(int argc, char** argv) {
     glutInitWindowPosition(50, 25);
 
     //Configure Window Size
-    glutInitWindowSize(1024,768);
+    glutInitWindowSize(gWidth, gHeight);
 
     //Create Window
     glutCreateWindow("Hello OpenGL");
-
 
     //Call to the drawing function
     glutDisplayFunc(draw);
