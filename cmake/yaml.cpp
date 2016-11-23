@@ -124,7 +124,7 @@ void drawText(SkCanvas *c, YAML::Node &item) {
         paint.setColor(color);
     }
     if (item["size"]) {
-        paint.setTextSize(item["size"].as<double>());
+        paint.setTextSize(item["size"].as<double>() * 16. / 12.);
         cout << item["size"].as<double>();
     }
 
@@ -168,7 +168,7 @@ void drawGlyphs(SkCanvas *c, YAML::Node &item) {
 
     SkPaint paint;
     if (item["size"]) {
-        paint.setTextSize(item["size"].as<double>());
+        paint.setTextSize(item["size"].as<double>() * 16. / 12.);
         cout << item["size"].as<double>();
     }
 
@@ -184,11 +184,6 @@ void drawGlyphs(SkCanvas *c, YAML::Node &item) {
         paint.setTypeface(typeface);
     }
 
-    if (item["color"]) {
-        auto color = item["color"].as<SkColorW>().color;
-        paint.setColor(color);
-    }
-    
     if (item["color"]) {
         auto color = item["color"].as<SkColorW>().color;
         paint.setColor(color);

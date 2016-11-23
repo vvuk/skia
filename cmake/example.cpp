@@ -106,7 +106,7 @@ int main(int, char**) {
     canvas->clear(SK_ColorRED);
     //canvas->drawText(msg, strlen(msg), 90,120, paint);
 
-    drawYAMLFile(canvas, "frame-1155.yaml");
+    drawYAMLFile(canvas, "glyphs.yaml");
 
 #ifdef INDIRECT
     sk_sp<SkPicture> pic = recorder.finishRecordingAsPicture();
