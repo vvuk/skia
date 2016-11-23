@@ -129,28 +129,39 @@ if (nullptr == fSurface) {
     glClear(GL_COLOR_BUFFER_BIT);
     SkCanvas* canvas = fSurface->getCanvas();   // We don't manage this pointer's lifetime.
 
-    auto before = std::chrono::high_resolution_clock::now();
-
-    int k;
-    while (1) {
-//    gPic->playback(canvas);
-
-///    canvas->clear(0xff000000 | k++);
-    canvas->drawPicture(gPic);
-            canvas->flush();
-
-
-    // Black background
-    //Draw i
-    glFlush();
-
-    auto after = std::chrono::high_resolution_clock::now();
-
     using FpMilliseconds = 
         std::chrono::duration<double, std::chrono::milliseconds::period>;
 
-    printf("%f\n", FpMilliseconds(after - before).count());
-    before = after;
+
+    auto before = std::chrono::high_resolution_clock::now();
+
+    FpMilliseconds min_frame = FpMilliseconds::max();
+    FpMilliseconds max_frame = FpMilliseconds::min();
+    FpMilliseconds sum_frame = FpMilliseconds::zero();
+
+    int k = 0;
+    while (1) {
+        canvas->drawPicture(gPic);
+        canvas->flush();
+        glFlush();
+
+        auto after = std::chrono::high_resolution_clock::now();
+        auto dur = after - before;
+
+        min_frame = std::min(min_frame, FpMilliseconds(dur));
+        max_frame = std::max(max_frame, FpMilliseconds(dur));
+        sum_frame += dur;
+
+        if (++k == 60) {
+            printf("%3.6f [%3.6f .. %3.6f]\n", (sum_frame / k).count(), min_frame.count(), max_frame.count());
+            k = 0;
+            min_frame = FpMilliseconds::max();
+            max_frame = FpMilliseconds::min();
+            sum_frame = FpMilliseconds::zero();
+        }
+        
+        //printf("%f\n", FpMilliseconds(after - before).count());
+        before = after;
     }
 
 }
