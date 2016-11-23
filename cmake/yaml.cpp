@@ -56,7 +56,14 @@ struct convert<SkColorW> {
                 rhs.color = SK_ColorBLUE;
                 return true;
             }
-
+            if (val == "white") {
+                rhs.color = SK_ColorWHITE;
+                return true;
+            }
+            if (val == "black") {
+                rhs.color = SK_ColorBLACK;
+                return true;
+            }
 
             auto vec = node.as<vector<double>>();
             if (vec.size() == 4) {
