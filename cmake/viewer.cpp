@@ -155,7 +155,7 @@ if (nullptr == fSurface) {
 
         if (++k == 60) {
             double ms = (sum_frame / k).count();
-            printf("%3.6f [%3.6f .. %3.6f]  -- %4.7f fps\n", ms, min_frame.count(), max_frame.count(), 1000.0 / ms);
+            printf("%3.3f [%3.3f .. %3.3f]  -- %4.2f fps\n", ms, min_frame.count(), max_frame.count(), 1000.0 / ms);
             k = 0;
             min_frame = FpMilliseconds::max();
             max_frame = FpMilliseconds::min();
