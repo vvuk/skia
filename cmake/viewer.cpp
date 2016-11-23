@@ -199,6 +199,8 @@ int main(int argc, char** argv) {
     SkFILEWStream stream("out.skp");
     pic->serialize(&stream);
 #endif
+
+#if 0
     // Grab a snapshot of the surface as an immutable SkImage.
     sk_sp<SkImage> image = surface->makeImageSnapshot();
     // Encode that image as a .png into a blob in memory.
@@ -209,6 +211,9 @@ int main(int argc, char** argv) {
     std::ofstream(path, std::ios::out | std::ios::binary)
         .write((const char*)png->data(), png->size());
     std::cout << "Wrote " << path << std::endl;
+#endif
+
+    std::cout << "Rendering..." << std::endl;
 
     glutInit(&argc, argv);
 
