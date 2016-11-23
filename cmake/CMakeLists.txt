@@ -360,8 +360,8 @@ add_subdirectory(yaml-cpp)
 include_directories(yaml-cpp/include)
 
 # Now build a simple example app that uses Skia via libskia.so.
-add_executable(example example.cpp)
-add_executable(viewer viewer.cpp)
+add_executable(example example.cpp yaml.cpp)
+add_executable(viewer viewer.cpp yaml.cpp)
 
 find_package(GLUT REQUIRED)
 include_directories(${GLUT_INCLUDE_DIRS})
