@@ -168,7 +168,7 @@ void drawGlyphs(SkCanvas *c, YAML::Node &item) {
 
     SkPaint paint;
     if (item["size"]) {
-        paint.setTextSize(item["size"].as<double>());
+        paint.setTextSize(item["size"].as<double>()*1.5);
         cout << item["size"].as<double>();
     }
 
