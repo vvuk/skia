@@ -110,7 +110,6 @@ struct convert<SkRect> {
     static bool decode(const Node& node, SkRect& rhs) {
         if (node.IsScalar()) {
             auto vec = node.as<vector<double>>();
-            std::cout << "is rect";
             rhs = SkRect::MakeXYWH(vec[0],
                                    vec[1],
                                    vec[2],
@@ -132,7 +131,6 @@ void drawText(SkCanvas *c, YAML::Node &item) {
     }
     if (item["size"]) {
         paint.setTextSize(item["size"].as<double>() * 16. / 12.);
-        cout << item["size"].as<double>();
     }
 
     auto text = item["text"].as<string>();
@@ -176,7 +174,6 @@ void drawGlyphs(SkCanvas *c, YAML::Node &item) {
     SkPaint paint;
     if (item["size"]) {
         paint.setTextSize(item["size"].as<double>() * 16. / 12.);
-        cout << item["size"].as<double>();
     }
 
     SkFontStyle::Weight weight = SkFontStyle::kNormal_Weight;
@@ -222,7 +219,6 @@ void drawStackingContext(SkCanvas *c, YAML::Node &node) {
 
 
 void drawItem(SkCanvas *c, YAML::Node &node) {
-    std::cout << "item\n";
     if (node["text"]) {
         drawText(c, node);
     } else if (node["rect"]) {
