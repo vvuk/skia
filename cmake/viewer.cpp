@@ -29,6 +29,8 @@
 
 #include <chrono>
 
+#include <GLFW/glfw3.h>
+
 static int gWidth = 1920;
 static int gHeight = 1080;
 
@@ -84,100 +86,33 @@ sk_sp<SkImage> GetResourceAsImage(const char* path) {
 extern SkImageEncoder_EncodeReg gEReg;
 SkImageEncoder_EncodeReg *k = &gEReg;
 
-#include <GL/glut.h>
+
+static void error_callback(int error, const char* description)
+{
+    fprintf(stderr, "Error: %s\n", description);
+}
+static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+        glfwSetWindowShouldClose(window, GLFW_TRUE);
+}
 
 
 
 sk_sp<SkPicture> gPic;
 void draw(void) {
-    sk_sp<const GrGLInterface> fBackendContext;
-
-    sk_sp<const GrGLInterface> glInterface;
-    glInterface.reset(GrGLCreateNativeInterface());
-    fBackendContext.reset(GrGLInterfaceRemoveNVPR(glInterface.get()));
-
-    //SkASSERT(nullptr == fContext);
-    auto fContext = GrContext::Create(kOpenGL_GrBackend, (GrBackendContext)fBackendContext.get());
-
-    sk_sp<SkSurface> fSurface;
-if (nullptr == fSurface) {
-    auto fActualColorBits =  24;
-
-    if (fContext) {
-	GrBackendRenderTargetDesc desc;
-	desc.fWidth = gWidth;
-	desc.fHeight = gHeight;
-	desc.fConfig = kRGBA_8888_GrPixelConfig;
-	desc.fOrigin = kBottomLeft_GrSurfaceOrigin;
-	desc.fSampleCnt = 0;
-	desc.fStencilBits = 0;
-	GrGLint buffer;
-
-    #ifndef GL_FRAMEBUFFER_BINDING
-    #define GL_FRAMEBUFFER_BINDING            0x8CA6
-    #endif
-
-	glGetIntegerv(GL_FRAMEBUFFER_BINDING, &buffer);
-	desc.fRenderTargetHandle = buffer;
-    SkSurfaceProps    fSurfaceProps(SkSurfaceProps::kLegacyFontHost_InitType);
-
-	fSurface = SkSurface::MakeFromBackendRenderTarget(fContext, desc, &fSurfaceProps);
-	
-    }
-}
-
-    glClearColor(0.0f,1.0f,0.0f,1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
-    SkCanvas* canvas = fSurface->getCanvas();   // We don't manage this pointer's lifetime.
-
-    using FpMilliseconds = 
-        std::chrono::duration<double, std::chrono::milliseconds::period>;
-
-
-    auto before = std::chrono::high_resolution_clock::now();
-
-    FpMilliseconds min_frame = FpMilliseconds::max();
-    FpMilliseconds max_frame = FpMilliseconds::min();
-    FpMilliseconds sum_frame = FpMilliseconds::zero();
-
-    int k = 0;
-    while (1) {
-        canvas->drawPicture(gPic);
-        canvas->flush();
-        glFlush();
-
-        auto after = std::chrono::high_resolution_clock::now();
-        auto dur = after - before;
-
-        min_frame = std::min(min_frame, FpMilliseconds(dur));
-        max_frame = std::max(max_frame, FpMilliseconds(dur));
-        sum_frame += dur;
-
-        if (++k == 60) {
-            double ms = (sum_frame / k).count();
-            printf("%3.3f [%3.3f .. %3.3f]  -- %4.2f fps\n", ms, min_frame.count(), max_frame.count(), 1000.0 / ms);
-            k = 0;
-            min_frame = FpMilliseconds::max();
-            max_frame = FpMilliseconds::min();
-            sum_frame = FpMilliseconds::zero();
-        }
-        
-        //printf("%f\n", FpMilliseconds(after - before).count());
-        before = after;
-    }
-
 }
 
 int main(int argc, char** argv) {
     
     SkPictureRecorder recorder;
-    SkCanvas* canvas = recorder.beginRecording(gWidth, gHeight, nullptr, 0);
+    SkCanvas* skp_canvas = recorder.beginRecording(gWidth, gHeight, nullptr, 0);
 
     static const char* msg = "Hello world!";
-    canvas->clear(SK_ColorRED);
+    skp_canvas->clear(SK_ColorRED);
     //canvas->drawText(msg, strlen(msg), 90,120, paint);
 
-    drawYAMLFile(canvas, argv[1]);
+    drawYAMLFile(skp_canvas, argv[1]);
 
     sk_sp<SkPicture> pic = recorder.finishRecordingAsPicture();
     // Draw to the surface via its SkCanvas.
@@ -207,28 +142,103 @@ int main(int argc, char** argv) {
 
     std::cout << "Rendering..." << std::endl;
 
-    glutInit(&argc, argv);
 
-    /*Setting up  The Display
-    /    -RGB color model + Alpha Channel = GLUT_RGBA
-    */
-    glutInitDisplayMode(GLUT_RGBA|GLUT_SINGLE);
+    GLFWwindow* window;
+    glfwSetErrorCallback(error_callback);
+    if (!glfwInit())
+        exit(EXIT_FAILURE);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+    window = glfwCreateWindow(gWidth, gHeight, "Simple example", NULL, NULL);
+    if (!window)
+    {
+        glfwTerminate();
+        exit(EXIT_FAILURE);
+    }
+    glfwSetKeyCallback(window, key_callback);
+    glfwMakeContextCurrent(window);
+    glfwSwapInterval(0);
 
-    //Configure Window Postion
-    glutInitWindowPosition(50, 25);
+    sk_sp<const GrGLInterface> fBackendContext;
 
-    //Configure Window Size
-    glutInitWindowSize(gWidth, gHeight);
+    sk_sp<const GrGLInterface> glInterface;
+    glInterface.reset(GrGLCreateNativeInterface());
+    fBackendContext.reset(GrGLInterfaceRemoveNVPR(glInterface.get()));
 
-    //Create Window
-    glutCreateWindow("Hello OpenGL");
+    //SkASSERT(nullptr == fContext);
+    auto fContext = GrContext::Create(kOpenGL_GrBackend, (GrBackendContext)fBackendContext.get());
 
-    //Call to the drawing function
-    glutDisplayFunc(draw);
+    sk_sp<SkSurface> fSurface;
+    if (nullptr == fSurface) {
+        auto fActualColorBits =  24;
 
-    // Loop require by OpenGL
-    glutMainLoop();
+        if (fContext) {
+            GrBackendRenderTargetDesc desc;
+            desc.fWidth = gWidth;
+            desc.fHeight = gHeight;
+            desc.fConfig = kRGBA_8888_GrPixelConfig;
+            desc.fOrigin = kBottomLeft_GrSurfaceOrigin;
+            desc.fSampleCnt = 0;
+            desc.fStencilBits = 0;
+            GrGLint buffer;
 
-    return 0;
+#ifndef GL_FRAMEBUFFER_BINDING
+#define GL_FRAMEBUFFER_BINDING            0x8CA6
+#endif
+
+            glGetIntegerv(GL_FRAMEBUFFER_BINDING, &buffer);
+            desc.fRenderTargetHandle = buffer;
+            SkSurfaceProps    fSurfaceProps(SkSurfaceProps::kLegacyFontHost_InitType);
+
+            fSurface = SkSurface::MakeFromBackendRenderTarget(fContext, desc, &fSurfaceProps);
+
+        }
+    }
+
+    glClearColor(0.0f,1.0f,0.0f,1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+    SkCanvas* canvas = fSurface->getCanvas();   // We don't manage this pointer's lifetime.
+
+    using FpMilliseconds = 
+        std::chrono::duration<double, std::chrono::milliseconds::period>;
+
+
+    auto before = std::chrono::high_resolution_clock::now();
+
+    FpMilliseconds min_frame = FpMilliseconds::max();
+    FpMilliseconds max_frame = FpMilliseconds::min();
+    FpMilliseconds sum_frame = FpMilliseconds::zero();
+
+    int k = 0;
+    while (!glfwWindowShouldClose(window))
+    {
+
+        canvas->drawPicture(gPic);
+        canvas->flush();
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+
+        auto after = std::chrono::high_resolution_clock::now();
+        auto dur = after - before;
+
+        min_frame = std::min(min_frame, FpMilliseconds(dur));
+        max_frame = std::max(max_frame, FpMilliseconds(dur));
+        sum_frame += dur;
+
+        if (++k == 60) {
+            double ms = (sum_frame / k).count();
+            printf("%3.3f [%3.3f .. %3.3f]  -- %4.2f fps\n", ms, min_frame.count(), max_frame.count(), 1000.0 / ms);
+            k = 0;
+            min_frame = FpMilliseconds::max();
+            max_frame = FpMilliseconds::min();
+            sum_frame = FpMilliseconds::zero();
+        }
+
+        //printf("%f\n", FpMilliseconds(after - before).count());
+        before = after;
+    }
+    glfwDestroyWindow(window);
+    glfwTerminate();
+
 }
 

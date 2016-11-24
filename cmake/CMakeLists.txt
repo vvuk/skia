@@ -9,7 +9,7 @@ if (MSVC)
   include_directories(nuget-packages/zlib.v140.windesktop.msvcstl.dyn.rt-dyn.1.2.8.8/build/native/include nuget-packages/nupengl.core.0.1.0.1/build/native/include)
   link_directories(nuget-packages/zlib.v140.windesktop.msvcstl.dyn.rt-dyn.1.2.8.8/lib/native/v140/windesktop/msvcstl/dyn/rt-dyn/x64/Release nuget-packages/nupengl.core.0.1.0.1/build/native/lib/x64)
 
-  set(WIN32_LIBS zlib.lib freeglut.lib)
+  set(WIN32_LIBS zlib.lib)
 endif ()
 
 # Default to Release mode.  We're mainly targeting Skia users, not Skia developers.
@@ -369,19 +369,14 @@ add_subdirectory(yaml-cpp)
 include_directories(yaml-cpp/include)
 include_directories(yaml-cpp/include/yaml-cpp)
 
+set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+add_subdirectory(glfw)
+
 # Now build a simple example app that uses Skia via libskia.so.
 #add_executable(example example.cpp yaml.cpp)
 add_executable(viewer viewer.cpp yaml.cpp)
 
-if (NOT MSVC)
-  find_package(GLUT REQUIRED)
-  include_directories(${GLUT_INCLUDE_DIRS})
-  link_directories(${GLUT_LIBRARY_DIRS})
-  add_definitions(${GLUT_DEFINITIONS})
-  if (NOT GLUT_FOUND)
-    message(ERROR " GLUT not found!")
-  endif()
-endif()
-
 #target_link_libraries(example skia yaml-cpp ${OPENGL_LIBRARIES})
-target_link_libraries(viewer skia yaml-cpp ${OPENGL_LIBRARIES} ${GLUT_LIBRARY} ${WIN32_LIBS})
+target_link_libraries(viewer skia yaml-cpp ${OPENGL_LIBRARIES} ${WIN32_LIBS} glfw)
