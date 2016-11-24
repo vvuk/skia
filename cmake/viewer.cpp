@@ -207,7 +207,9 @@ int main(int argc, char** argv) {
     auto first = std::chrono::high_resolution_clock::now();
 
     FpMilliseconds min_frame = FpMilliseconds::max();
+    FpMilliseconds min_min_frame = FpMilliseconds::max();
     FpMilliseconds max_frame = FpMilliseconds::min();
+    FpMilliseconds max_max_frame = FpMilliseconds::min();
     FpMilliseconds sum_frame = FpMilliseconds::zero();
 
     int k = 0;
@@ -223,12 +225,15 @@ int main(int argc, char** argv) {
         auto dur = after - before;
 
         min_frame = std::min(min_frame, FpMilliseconds(dur));
+        min_min_frame = std::min(min_min_frame, FpMilliseconds(dur));
         max_frame = std::max(max_frame, FpMilliseconds(dur));
+        max_max_frame = std::max(max_max_frame, FpMilliseconds(dur));
         sum_frame += dur;
 
         if (++k == 60) {
             double ms = (sum_frame / k).count();
-            printf("%3.3f [%3.3f .. %3.3f]  -- %4.2f fps\n", ms, min_frame.count(), max_frame.count(), 1000.0 / ms);
+            printf("%3.3f [%3.3f .. %3.3f]  -- %4.2f fps  -- (global %3.3f .. %3.3f)\n", ms, min_frame.count(), max_frame.count(), 1000.0 / ms,
+                   min_min_frame.count(), max_max_frame.count());
             k = 0;
             min_frame = FpMilliseconds::max();
             max_frame = FpMilliseconds::min();
