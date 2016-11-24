@@ -1,5 +1,7 @@
 @ECHO OFF
 
+pushd %~dp0
+
 IF NOT EXIST build (
    nuget install nupengl.core
    nuget install zlib
@@ -16,4 +18,7 @@ IF NOT EXIST build (
    cd ..
 )
 
-cmake --build build --config Release --target viewer
+cmake --build build --config Release --target viewer -- -nologo -m -v:m
+
+popd
+
