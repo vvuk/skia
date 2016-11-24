@@ -16,3 +16,4 @@ skia_link_arguments.txt
 
 build
 nuget-packages
+parse.dir

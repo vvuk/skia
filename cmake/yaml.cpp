@@ -122,6 +122,16 @@ struct convert<SkRect> {
 
 }
 
+static string gResPrefix;
+
+string makeResourcePath(const string& rsrc) {
+    if (gResPrefix.length() == 0) {
+        return rsrc;
+    }
+
+    return gResPrefix + "/" + rsrc;
+}
+
 void drawText(SkCanvas *c, YAML::Node &item) {
     auto origin = item["origin"].as<vector<double>>();
     SkPaint paint;
@@ -201,8 +211,8 @@ void drawGlyphs(SkCanvas *c, YAML::Node &item) {
 }
 
 void drawImage(SkCanvas *c, YAML::Node &node) {
-    auto path = node["image"].as<string>();
-    std::cout << "image path: " << path << std::endl;
+    auto path = makeResourcePath(node["image"].as<string>());
+    //std::cout << "image path: " << path << std::endl;
     auto bounds = node["bounds"].as<vector<double>>();
     sk_sp<SkImage> img = GetResourceAsImage(path.c_str());
     c->drawImage(img, bounds[0], bounds[1]);
@@ -241,9 +251,14 @@ void drawItem(SkCanvas *c, YAML::Node &node) {
 }
 
 
-void drawYAMLFile(SkCanvas *canvas, const char *file) {
-    std::ifstream fin(file);
-
+void drawYAMLFile(SkCanvas *canvas, const char *filename_raw) {
+    string filename(filename_raw);
+    auto last_slash = filename.find_last_of("/\\");
+    if (last_slash != string::npos) {
+        gResPrefix = filename.substr(0, last_slash);
+    }
+    
+    std::ifstream fin(filename);
     YAML::Node doc = YAML::Load(fin);
     for (auto i : doc["root"]["items"]) {
         drawItem(canvas, i);
