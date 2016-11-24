@@ -378,9 +378,6 @@ set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 add_subdirectory(glfw)
 
-# Now build a simple example app that uses Skia via libskia.so.
-#add_executable(example example.cpp yaml.cpp)
 add_executable(viewer viewer.cpp yaml.cpp ${VIEWER_MANIFEST})
 
-#target_link_libraries(example skia yaml-cpp ${OPENGL_LIBRARIES})
 target_link_libraries(viewer skia yaml-cpp ${OPENGL_LIBRARIES} ${WIN32_LIBS} glfw)

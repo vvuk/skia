@@ -232,8 +232,8 @@ int main(int argc, char** argv) {
 
         if (++k == 60) {
             double ms = (sum_frame / k).count();
-            printf("%3.3f [%3.3f .. %3.3f]  -- %4.2f fps  -- (global %3.3f .. %3.3f)\n", ms, min_frame.count(), max_frame.count(), 1000.0 / ms,
-                   min_min_frame.count(), max_max_frame.count());
+            printf("%3.3f [%3.3f .. %3.3f]  -- %4.2f fps  -- (global %3.3f .. %3.3f)\n", ms, min_frame.count(),
+                   max_frame.count(), 1000.0 / ms, min_min_frame.count(), max_max_frame.count());
             k = 0;
             min_frame = FpMilliseconds::max();
             max_frame = FpMilliseconds::min();
@@ -247,8 +247,8 @@ int main(int argc, char** argv) {
             exit(0);
         }
     }
+
     glfwDestroyWindow(window);
     glfwTerminate();
-
 }
 
