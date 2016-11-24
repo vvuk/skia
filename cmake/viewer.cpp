@@ -204,6 +204,7 @@ int main(int argc, char** argv) {
 
 
     auto before = std::chrono::high_resolution_clock::now();
+    auto first = std::chrono::high_resolution_clock::now();
 
     FpMilliseconds min_frame = FpMilliseconds::max();
     FpMilliseconds max_frame = FpMilliseconds::min();
@@ -236,6 +237,10 @@ int main(int argc, char** argv) {
 
         //printf("%f\n", FpMilliseconds(after - before).count());
         before = after;
+
+        if ((after-first) > std::chrono::seconds(10)) {
+            exit(0);
+        }
     }
     glfwDestroyWindow(window);
     glfwTerminate();

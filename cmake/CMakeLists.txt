@@ -365,6 +365,10 @@ foreach (include ${public_includes})
 endforeach()
 file(APPEND ${skia_h_path} "\n#endif  // skia_DEFINED\n")
 
+if (MSVC)
+  set(VIEWER_MANIFEST viewer.exe.manifest)
+endif()
+
 add_subdirectory(yaml-cpp)
 include_directories(yaml-cpp/include)
 include_directories(yaml-cpp/include/yaml-cpp)
@@ -376,7 +380,7 @@ add_subdirectory(glfw)
 
 # Now build a simple example app that uses Skia via libskia.so.
 #add_executable(example example.cpp yaml.cpp)
-add_executable(viewer viewer.cpp yaml.cpp)
+add_executable(viewer viewer.cpp yaml.cpp ${VIEWER_MANIFEST})
 
 #target_link_libraries(example skia yaml-cpp ${OPENGL_LIBRARIES})
 target_link_libraries(viewer skia yaml-cpp ${OPENGL_LIBRARIES} ${WIN32_LIBS} glfw)
