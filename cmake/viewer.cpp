@@ -31,10 +31,13 @@
 
 #include <GLFW/glfw3.h>
 
+#include "yaml-cpp/yaml.h"
+
 static int gWidth = 1920;
 static int gHeight = 1080;
 
-extern void drawYAMLFile(SkCanvas *canvas, const char *file);
+extern YAML::Node loadYAMLFile(const char *file);
+extern void drawYAMLFile(YAML::Node &doc, SkCanvas *canvas);
 
 // These setup_gl_context() are not meant to represent good form.
 // They are just quick hacks to get us going.
@@ -97,51 +100,58 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
         glfwSetWindowShouldClose(window, GL_TRUE);
 }
 
+void
+dump_to_png(SkPicture *pic, const char *png_name)
+{
+    std::shared_ptr<SkSurface> surface = create_raster_surface(gWidth, gHeight);
+    SkCanvas* ic = surface->getCanvas();   // We don't manage this pointer's lifetime.
+    pic->playback(ic);
 
+    sk_sp<SkImage> image = surface->makeImageSnapshot();
+    std::shared_ptr<SkData> png = adopt(image->encode(SkImageEncoder::kPNG_Type, 100));
 
-sk_sp<SkPicture> gPic;
-void draw(void) {
+    std::ofstream(png_name, std::ios::out | std::ios::binary)
+        .write((const char*)png->data(), png->size());
+    std::cout << "Wrote " << png_name << std::endl;
 }
 
-int main(int argc, char** argv) {
-    
-    SkPictureRecorder recorder;
-    SkCanvas* skp_canvas = recorder.beginRecording(gWidth, gHeight, nullptr, 0);
+int
+main(int argc, char** argv)
+{
+    bool should_rebuild_pic = false;
+    const char *yaml_file = nullptr;
+    const uint32_t frames_between_dumps = 60;
+    uint32_t exit_after_seconds = 3;
 
-    static const char* msg = "Hello world!";
-    skp_canvas->clear(SK_ColorRED);
-    //canvas->drawText(msg, strlen(msg), 90,120, paint);
+    if (argc == 1) {
+        printf("Usage: viewer [-r] file.yaml\n");
+        exit(1);
+    }
 
-    drawYAMLFile(skp_canvas, argv[1]);
+    int n = 1;
+    while (argv[n]) {
+        if (strcmp(argv[n], "-r") == 0) {
+            should_rebuild_pic = true;
+        } else if (strcmp(argv[n], "-l") == 0) {
+            exit_after_seconds = atoi(argv[n+1]);
+            n++;
+        } else if (!yaml_file) {
+            yaml_file = argv[n];
+        } else {
+            printf("Usage: viewer [-r] [-l seconds] file.yaml\n");
+            exit(1);
+        }
+        n++;
+    }
 
-    sk_sp<SkPicture> pic = recorder.finishRecordingAsPicture();
-    // Draw to the surface via its SkCanvas.
-    gPic = pic;
+    YAML::Node yaml_doc = loadYAMLFile(yaml_file);
 
 #if 0
     SkFILEWStream stream("out.skp");
     pic->serialize(&stream);
 #endif
 
-#if 0
-    std::shared_ptr<SkSurface> surface = create_raster_surface(gWidth, gHeight);
-    SkCanvas* ic = surface->getCanvas();   // We don't manage this pointer's lifetime.
-    pic->playback(ic);
-
-    // Grab a snapshot of the surface as an immutable SkImage.
-    sk_sp<SkImage> image = surface->makeImageSnapshot();
-    // Encode that image as a .png into a blob in memory.
-    std::shared_ptr<SkData> png = adopt(image->encode(SkImageEncoder::kPNG_Type, 100));
-
-    // This code is no longer Skia-specific.  We just dump the .png to disk.  Any way works.
-    static const char* path = "example.png";
-    std::ofstream(path, std::ios::out | std::ios::binary)
-        .write((const char*)png->data(), png->size());
-    std::cout << "Wrote " << path << std::endl;
-#endif
-
     std::cout << "Rendering..." << std::endl;
-
 
     GLFWwindow* window;
     glfwSetErrorCallback(error_callback);
@@ -149,7 +159,7 @@ int main(int argc, char** argv) {
         exit(EXIT_FAILURE);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
-    window = glfwCreateWindow(gWidth, gHeight, "Simple example", NULL, NULL);
+    window = glfwCreateWindow(gWidth, gHeight, "YAML viewer", NULL, NULL);
     if (!window)
     {
         glfwTerminate();
@@ -202,7 +212,6 @@ int main(int argc, char** argv) {
     using FpMilliseconds = 
         std::chrono::duration<double, std::chrono::milliseconds::period>;
 
-
     auto before = std::chrono::high_resolution_clock::now();
     auto first = std::chrono::high_resolution_clock::now();
 
@@ -216,15 +225,25 @@ int main(int argc, char** argv) {
     double sum_block_avg_ms = 0.;
     uint32_t num_ms_recorded = 0;
 
-    const uint32_t frames_between_dumps = 60;
-    const uint32_t exit_after_seconds = 3;
-
     uint32_t frame = 0;
     bool warmed_up = false;
 
+    sk_sp<SkPicture> pic;
+
     while (!glfwWindowShouldClose(window))
     {
-        canvas->drawPicture(gPic);
+        if (!pic || should_rebuild_pic) {
+            SkPictureRecorder recorder;
+            SkCanvas* skp_canvas = recorder.beginRecording(gWidth, gHeight, nullptr, 0);
+
+            skp_canvas->clear(SK_ColorRED);
+
+            drawYAMLFile(yaml_doc, skp_canvas);
+
+            pic = recorder.finishRecordingAsPicture();
+        }
+
+        canvas->drawPicture(pic);
         canvas->flush();
         glfwSwapBuffers(window);
         glfwPollEvents();

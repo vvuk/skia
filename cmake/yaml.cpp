@@ -251,7 +251,7 @@ void drawItem(SkCanvas *c, YAML::Node &node) {
 }
 
 
-void drawYAMLFile(SkCanvas *canvas, const char *filename_raw) {
+YAML::Node loadYAMLFile(const char *filename_raw) {
     string filename(filename_raw);
     auto last_slash = filename.find_last_of("/\\");
     if (last_slash != string::npos) {
@@ -260,6 +260,10 @@ void drawYAMLFile(SkCanvas *canvas, const char *filename_raw) {
     
     std::ifstream fin(filename);
     YAML::Node doc = YAML::Load(fin);
+    return doc;
+}
+
+void drawYAMLFile(YAML::Node &doc, SkCanvas *canvas) {
     for (auto i : doc["root"]["items"]) {
         drawItem(canvas, i);
     }
