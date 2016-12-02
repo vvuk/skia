@@ -123,7 +123,7 @@ int main(int argc, char** argv) {
     pic->serialize(&stream);
 #endif
 
-#if 1
+#if 0
     std::shared_ptr<SkSurface> surface = create_raster_surface(gWidth, gHeight);
     SkCanvas* ic = surface->getCanvas();   // We don't manage this pointer's lifetime.
     pic->playback(ic);
@@ -206,35 +206,55 @@ int main(int argc, char** argv) {
     auto before = std::chrono::high_resolution_clock::now();
     auto first = std::chrono::high_resolution_clock::now();
 
-    FpMilliseconds min_frame = FpMilliseconds::max();
-    FpMilliseconds min_min_frame = FpMilliseconds::max();
-    FpMilliseconds max_frame = FpMilliseconds::min();
-    FpMilliseconds max_max_frame = FpMilliseconds::min();
-    FpMilliseconds sum_frame = FpMilliseconds::zero();
+    auto min_frame = FpMilliseconds::max();
+    auto min_min_frame = FpMilliseconds::max();
+    auto max_frame = FpMilliseconds::min();
+    auto max_max_frame = FpMilliseconds::min();
+    auto sum_frame = FpMilliseconds::zero();
 
-    int k = 0;
+    // I really would like some of binning of series data here
+    double sum_block_avg_ms = 0.;
+    uint32_t num_ms_recorded = 0;
+
+    const uint32_t frames_between_dumps = 60;
+    const uint32_t exit_after_seconds = 3;
+
+    uint32_t frame = 0;
+    bool warmed_up = false;
+
     while (!glfwWindowShouldClose(window))
     {
-
         canvas->drawPicture(gPic);
         canvas->flush();
         glfwSwapBuffers(window);
         glfwPollEvents();
 
+        warmed_up = frame > frames_between_dumps;
         auto after = std::chrono::high_resolution_clock::now();
         auto dur = after - before;
 
         min_frame = std::min(min_frame, FpMilliseconds(dur));
-        min_min_frame = std::min(min_min_frame, FpMilliseconds(dur));
         max_frame = std::max(max_frame, FpMilliseconds(dur));
-        max_max_frame = std::max(max_max_frame, FpMilliseconds(dur));
         sum_frame += dur;
 
-        if (++k == 60) {
-            double ms = (sum_frame / k).count();
-            printf("%3.3f [%3.3f .. %3.3f]  -- %4.2f fps  -- (global %3.3f .. %3.3f)\n", ms, min_frame.count(),
-                   max_frame.count(), 1000.0 / ms, min_min_frame.count(), max_max_frame.count());
-            k = 0;
+        // only count globals for warmed up frames
+        if (warmed_up) {
+            min_min_frame = std::min(min_min_frame, FpMilliseconds(dur));
+            max_max_frame = std::max(max_max_frame, FpMilliseconds(dur));
+        }
+
+        if ((++frame % frames_between_dumps) == 0) {
+            double ms = (sum_frame / frames_between_dumps).count();
+            printf("%3.3f [%3.3f .. %3.3f]  -- %4.2f fps",
+                   ms, min_frame.count(), max_frame.count(), 1000.0 / ms);
+            if (warmed_up) {
+                printf("  -- (global %3.3f .. %3.3f)\n", min_min_frame.count(), max_max_frame.count());
+                sum_block_avg_ms += ms;
+                num_ms_recorded++;
+            } else {
+                printf("\n");
+            }
+
             min_frame = FpMilliseconds::max();
             max_frame = FpMilliseconds::min();
             sum_frame = FpMilliseconds::zero();
@@ -243,7 +263,12 @@ int main(int argc, char** argv) {
         //printf("%f\n", FpMilliseconds(after - before).count());
         before = after;
 
-        if ((after-first) > std::chrono::seconds(10)) {
+        if ((after-first) > std::chrono::seconds(exit_after_seconds)) {
+            double average_ms = sum_block_avg_ms / double(num_ms_recorded);
+            printf("min, avg, max (ms ):  % -4.3f, % -4.3f, % -4.3f\n",
+                   min_min_frame.count(), average_ms, max_max_frame.count());
+            printf("              (fps):  % -4.3f, % -4.3f, % -4.3f\n",
+                   1000.0 / min_min_frame.count(), 1000.0 / average_ms, 1000.0 / max_max_frame.count());
             exit(0);
         }
     }
