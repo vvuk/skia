@@ -25,6 +25,9 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <vector>
+#include <algorithm>
+#include <numeric>
 #include <assert.h>
 
 #include <chrono>
@@ -254,8 +257,7 @@ main(int argc, char** argv)
     auto sum_frame = FpMilliseconds::zero();
 
     // I really would like some of binning of series data here
-    double sum_block_avg_ms = 0.;
-    uint32_t num_ms_recorded = 0;
+    std::vector<double> block_avg_ms;
 
     uint32_t frame = 0;
     bool warmed_up = false;
@@ -301,8 +303,7 @@ main(int argc, char** argv)
                    ms, min_frame.count(), max_frame.count(), 1000.0 / ms);
             if (warmed_up) {
                 printf("  -- (global %3.3f .. %3.3f)\n", min_min_frame.count(), max_max_frame.count());
-                sum_block_avg_ms += ms;
-                num_ms_recorded++;
+                block_avg_ms.push_back(ms);
             } else {
                 printf("\n");
             }
@@ -316,11 +317,34 @@ main(int argc, char** argv)
         before = after;
 
         if ((after-first) > std::chrono::seconds(exit_after_seconds)) {
-            double average_ms = sum_block_avg_ms / double(num_ms_recorded);
-            printf("min, avg, max (ms ):  % -4.3f, % -4.3f, % -4.3f\n",
-                   min_min_frame.count(), average_ms, max_max_frame.count());
-            printf("              (fps):  % -4.3f, % -4.3f, % -4.3f\n",
-                   1000.0 / min_min_frame.count(), 1000.0 / average_ms, 1000.0 / max_max_frame.count());
+            std::sort(block_avg_ms.begin(), block_avg_ms.end());
+            double sum = std::accumulate(block_avg_ms.begin(), block_avg_ms.end(), 0.0);
+
+            size_t len = block_avg_ms.size();
+            size_t first_index = std::floor(len * 0.1);
+            size_t last_index = std::floor(len * 0.9);
+
+            double val_10th_pct = (block_avg_ms[first_index] + block_avg_ms[first_index+1]) / 2.0;
+            double val_90th_pct = (block_avg_ms[last_index] + block_avg_ms[last_index+1]) / 2.0;
+
+            double average_ms = sum / double(len);
+
+#define F(x) (1000.0 / (x))
+
+            if (false) {
+                printf("-     % 8s  % 8s  % 8s  % 8s  % 8s\n", "min", "90th", "avg", "10th", "max");
+                printf("ms:   % 8.3f  % 8.3f  % 8.3f  % 8.3f  % 8.3f\n",
+                       block_avg_ms.front(), val_10th_pct, average_ms, val_90th_pct, block_avg_ms.back());
+                printf("fps:  % 8.3f  % 8.3f  % 8.3f  % 8.3f  % 8.3f\n",
+                       F(block_avg_ms.front()), F(val_10th_pct), F(average_ms), F(val_90th_pct), F(block_avg_ms.back()));
+            } else {
+                printf("-     % 8s  % 8s  % 8s\n", "90th", "avg", "10th");
+                printf("ms:   % 8.3f  % 8.3f  % 8.3f\n",
+                       val_10th_pct, average_ms, val_90th_pct);
+                printf("fps:  % 8.3f  % 8.3f  % 8.3f\n",
+                       F(val_10th_pct), F(average_ms), F(val_90th_pct));
+            }
+
             exit(0);
         }
     }
