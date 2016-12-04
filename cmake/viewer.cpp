@@ -115,17 +115,24 @@ dump_to_png(SkPicture *pic, const char *png_name)
     std::cout << "Wrote " << png_name << std::endl;
 }
 
+void
+usage()
+{
+    printf("Usage: viewer [-r] [-l seconds] [-w width] [-h height] [-s scale] file.yaml|file.skp\n");
+    exit(1);
+}
+
 int
 main(int argc, char** argv)
 {
     bool should_rebuild_pic = false;
-    const char *yaml_file = nullptr;
+    const char *in_file = nullptr;
     const uint32_t frames_between_dumps = 60;
     uint32_t exit_after_seconds = 3;
+    double scale = 1.0;
 
     if (argc == 1) {
-        printf("Usage: viewer [-r] file.yaml\n");
-        exit(1);
+        usage();
     }
 
     int n = 1;
@@ -135,16 +142,41 @@ main(int argc, char** argv)
         } else if (strcmp(argv[n], "-l") == 0) {
             exit_after_seconds = atoi(argv[n+1]);
             n++;
-        } else if (!yaml_file) {
-            yaml_file = argv[n];
+        } else if (strcmp(argv[n], "-w") == 0) {
+            gWidth = atoi(argv[n+1]);
+            n++;
+        } else if (strcmp(argv[n], "-h") == 0) {
+            gHeight = atoi(argv[n+1]);
+            n++;
+        } else if (strcmp(argv[n], "-s") == 0) {
+            scale = atof(argv[n+1]);
+            n++;
+        } else if (!in_file) {
+            in_file = argv[n];
         } else {
-            printf("Usage: viewer [-r] [-l seconds] file.yaml\n");
-            exit(1);
+            usage();
         }
         n++;
     }
 
-    YAML::Node yaml_doc = loadYAMLFile(yaml_file);
+    sk_sp<SkPicture> pic;
+
+    YAML::Node yaml_doc;
+    if (strstr(in_file, ".skp") != nullptr) {
+        SkFILEStream stream(in_file);
+        pic = SkPicture::MakeFromStream(&stream);
+        if (!pic) {
+            printf("Failed to load SkPicture from %s!\n", in_file);
+            exit(1);
+        }
+
+        if (should_rebuild_pic) {
+            printf("Warning: -r ignored when loading SkPicture\n");
+            should_rebuild_pic = false;
+        }
+    } else {
+        yaml_doc = loadYAMLFile(in_file);
+    }
 
 #if 0
     SkFILEWStream stream("out.skp");
@@ -159,7 +191,7 @@ main(int argc, char** argv)
         exit(EXIT_FAILURE);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
-    window = glfwCreateWindow(gWidth, gHeight, "YAML viewer", NULL, NULL);
+    window = glfwCreateWindow(gWidth, gHeight, "Skia viewer", NULL, NULL);
     if (!window)
     {
         glfwTerminate();
@@ -228,7 +260,7 @@ main(int argc, char** argv)
     uint32_t frame = 0;
     bool warmed_up = false;
 
-    sk_sp<SkPicture> pic;
+    SkMatrix scaleMatrix = SkMatrix::MakeScale(SkDoubleToScalar(scale));
 
     while (!glfwWindowShouldClose(window))
     {
@@ -243,7 +275,8 @@ main(int argc, char** argv)
             pic = recorder.finishRecordingAsPicture();
         }
 
-        canvas->drawPicture(pic);
+        canvas->clear(SK_ColorWHITE);
+        canvas->drawPicture(pic, &scaleMatrix, nullptr);
         canvas->flush();
         glfwSwapBuffers(window);
         glfwPollEvents();
