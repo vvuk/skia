@@ -42,6 +42,19 @@ static int gHeight = 1080;
 extern YAML::Node loadYAMLFile(const char *file);
 extern void drawYAMLFile(YAML::Node &doc, SkCanvas *canvas);
 
+double percentile(std::vector<double> &values, int pct_int)
+{
+    double pct = pct_int / 100.;
+    double index_f = (values.size()-1) * pct;
+    size_t index = std::floor(index_f);
+    printf("size: %zd pct: %d index: %f\n", values.size(), pct_int, index_f);
+    if (index == index_f) {
+        return values[index];
+    } else {
+        return (values[index] + values[index+1]) / 2.;
+    }
+}
+
 // These setup_gl_context() are not meant to represent good form.
 // They are just quick hacks to get us going.
 #if defined(__APPLE__)
@@ -319,15 +332,10 @@ main(int argc, char** argv)
         if ((after-first) > std::chrono::seconds(exit_after_seconds)) {
             std::sort(block_avg_ms.begin(), block_avg_ms.end());
             double sum = std::accumulate(block_avg_ms.begin(), block_avg_ms.end(), 0.0);
+            double average_ms = sum / double(block_avg_ms.size());
 
-            size_t len = block_avg_ms.size();
-            size_t first_index = std::floor(len * 0.1);
-            size_t last_index = std::floor(len * 0.9);
-
-            double val_10th_pct = (block_avg_ms[first_index] + block_avg_ms[first_index+1]) / 2.0;
-            double val_90th_pct = (block_avg_ms[last_index] + block_avg_ms[last_index+1]) / 2.0;
-
-            double average_ms = sum / double(len);
+            double val_10th_pct = percentile(block_avg_ms, 10);
+            double val_90th_pct = percentile(block_avg_ms, 90);
 
 #define F(x) (1000.0 / (x))
 
